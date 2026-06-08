@@ -20,13 +20,24 @@ npm install
 npm start
 ```
 
-This runs the `index.js` entry point.
+This runs the `index.js` entry point. Then open
+[http://localhost:3000](http://localhost:3000) for the scroll feed.
+
+## Frontend
+
+A dependency-free static frontend (served from `public/`) presents courses as a
+full-screen, vertically snapping scroll feed. Each card shows a course and a
+**View lessons** button that lazy-loads its lessons from the API.
 
 ## Project Structure
 
 ```
 .
 ├── index.js            # Application entry point (Express server)
+├── public/             # Static frontend (vertical scroll feed)
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
 ├── data/
 │   ├── db.js           # SQLite connection, schema, and seed
 │   └── store.js        # Repository layer (data access functions)
