@@ -280,6 +280,14 @@ async function refreshLessons(box, courseId) {
   sort.value = `${state.sort}:${state.order}`;
 
   controls.append(addBtn, search, sort);
+
+  // Reordering only makes sense in the natural order view (no search, order ↑).
+  if (state.sort === "order" && state.order === "asc" && !state.q) {
+    const reorderBtn = el("button", "mini-btn", "↕ Reorder");
+    reorderBtn.addEventListener("click", () => enterReorderMode(box, courseId));
+    controls.appendChild(reorderBtn);
+  }
+
   box.appendChild(controls);
 
   const list = el("div", "lesson-list");
@@ -301,6 +309,76 @@ async function refreshLessons(box, courseId) {
   });
 
   await renderList();
+}
+
+// --- Reorder mode (drag and drop) ---
+
+// Find the item the dragged row should be inserted before, based on cursor Y.
+function dragAfterElement(container, y) {
+  const items = [...container.querySelectorAll(".reorder-item:not(.dragging)")];
+  let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+  for (const child of items) {
+    const rect = child.getBoundingClientRect();
+    const offset = y - rect.top - rect.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      closest = { offset, element: child };
+    }
+  }
+  return closest.element;
+}
+
+async function enterReorderMode(box, courseId) {
+  box.innerHTML = "";
+
+  const controls = el("div", "lesson-controls");
+  controls.appendChild(el("span", "reorder-hint", "Drag rows to reorder"));
+  const doneBtn = el("button", "mini-btn", "✓ Done");
+  doneBtn.addEventListener("click", () => refreshLessons(box, courseId));
+  controls.appendChild(doneBtn);
+  box.appendChild(controls);
+
+  let lessons;
+  try {
+    lessons = await api("GET", `/courses/${courseId}/lessons?sort=order&order=asc&limit=100`);
+  } catch (err) {
+    box.appendChild(el("p", "empty", `Failed to load: ${err.message}`));
+    return;
+  }
+  if (lessons.length === 0) {
+    box.appendChild(el("p", "empty", "No lessons to reorder."));
+    return;
+  }
+
+  const ul = el("ul", "lessons reorder-list");
+  for (const lesson of lessons) {
+    const li = el("li", "reorder-item");
+    li.draggable = true;
+    li.dataset.id = lesson.id;
+    li.appendChild(el("span", "drag-handle", "⠿"));
+    li.appendChild(el("span", "lesson__title", lesson.title));
+    ul.appendChild(li);
+  }
+  box.appendChild(ul);
+
+  let dragEl = null;
+  ul.addEventListener("dragstart", (e) => {
+    dragEl = e.target.closest(".reorder-item");
+    if (dragEl) dragEl.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+  });
+  ul.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    if (!dragEl) return;
+    const after = dragAfterElement(ul, e.clientY);
+    if (after == null) ul.appendChild(dragEl);
+    else ul.insertBefore(dragEl, after);
+  });
+  ul.addEventListener("dragend", async () => {
+    if (dragEl) dragEl.classList.remove("dragging");
+    dragEl = null;
+    const ids = [...ul.querySelectorAll(".reorder-item")].map((li) => Number(li.dataset.id));
+    await withAlert(() => api("PUT", `/courses/${courseId}/lessons/reorder`, { order: ids }));
+  });
 }
 
 // --- Course card ---

@@ -65,6 +65,19 @@ const LessonUpdate = {
   },
 };
 
+const ReorderLessons = {
+  type: "object",
+  properties: {
+    order: {
+      type: "array",
+      items: { type: "integer" },
+      description: "Every lesson id in the course, in the desired order.",
+      example: [3, 1, 2],
+    },
+  },
+  required: ["order"],
+};
+
 const notFound = {
   description: "Not found",
   content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
@@ -273,6 +286,32 @@ export const openapi = {
         },
       },
     },
+    "/courses/{courseId}/lessons/reorder": {
+      put: {
+        tags: ["Lessons"],
+        summary: "Reorder a course's lessons",
+        description:
+          "Body must list every lesson id in the course exactly once; each " +
+          "lesson's order is set to its 1-based position.",
+        parameters: [lessonCourseIdParam],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ReorderLessons" } } },
+        },
+        responses: {
+          200: {
+            description: "The reordered lessons",
+            content: {
+              "application/json": {
+                schema: { type: "array", items: { $ref: "#/components/schemas/Lesson" } },
+              },
+            },
+          },
+          400: badRequest,
+          404: notFound,
+        },
+      },
+    },
     "/courses/{courseId}/lessons/{lessonId}": {
       get: {
         tags: ["Lessons"],
@@ -318,6 +357,6 @@ export const openapi = {
     },
   },
   components: {
-    schemas: { Error, Course, NewCourse, CourseUpdate, Lesson, NewLesson, LessonUpdate },
+    schemas: { Error, Course, NewCourse, CourseUpdate, Lesson, NewLesson, LessonUpdate, ReorderLessons },
   },
 };
