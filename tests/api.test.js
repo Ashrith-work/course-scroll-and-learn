@@ -103,6 +103,55 @@ test("blank search query returns all courses", async () => {
   assert.equal(courses.length, 3);
 });
 
+test("GET /courses?limit caps results and sets X-Total-Count", async () => {
+  const res = await req("GET", "/courses?limit=2");
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("x-total-count"), "3");
+  const courses = await res.json();
+  assert.deepEqual(
+    courses.map((c) => c.id),
+    [1, 2]
+  );
+});
+
+test("GET /courses?offset skips earlier rows", async () => {
+  const res = await req("GET", "/courses?limit=2&offset=2");
+  const courses = await res.json();
+  assert.equal(courses.length, 1);
+  assert.equal(courses[0].id, 3);
+});
+
+test("offset past the end returns an empty page (total still reported)", async () => {
+  const res = await req("GET", "/courses?limit=2&offset=99");
+  assert.equal(res.headers.get("x-total-count"), "3");
+  assert.deepEqual(await res.json(), []);
+});
+
+test("pagination composes with search", async () => {
+  const res = await req("GET", "/courses?q=javascript&limit=1");
+  assert.equal(res.headers.get("x-total-count"), "2");
+  const courses = await res.json();
+  assert.equal(courses.length, 1);
+});
+
+test("GET /courses with a non-integer limit returns 400", async () => {
+  const res = await req("GET", "/courses?limit=abc");
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /limit must be an integer/);
+});
+
+test("GET /courses with a negative offset returns 400", async () => {
+  const res = await req("GET", "/courses?offset=-1");
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /offset must be an integer/);
+});
+
+test("GET /courses with limit above the max returns 400", async () => {
+  const res = await req("GET", "/courses?limit=101");
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /between 1 and 100/);
+});
+
 test("GET /courses/:id returns one course", async () => {
   const res = await req("GET", "/courses/1");
   assert.equal(res.status, 200);
