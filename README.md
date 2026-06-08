@@ -31,7 +31,10 @@ A dependency-free static frontend (served from `public/`) presents courses as a
 full-screen, vertically snapping scroll feed. Each card shows a course and a
 **View lessons** button that lazy-loads its lessons from the API.
 
-Full CRUD is available from the UI:
+**Log in / Sign up** from the header. Write controls (create, edit, delete,
+reorder) only appear once you're authenticated.
+
+Full CRUD is available from the UI (when logged in):
 
 - **＋ button** (bottom-right) — create a course
 - **Edit / Delete** on each course card (delete cascades to its lessons)
@@ -67,12 +70,14 @@ that persists the new order via `PUT /courses/:id/lessons/reorder`.
 │   └── openapi.js      # OpenAPI 3 spec (served at /openapi.json, UI at /docs)
 ├── data/
 │   ├── db.js           # SQLite connection, schema, and seed
-│   └── store.js        # Repository layer (data access functions)
+│   ├── store.js        # Repository layer (courses & lessons)
+│   └── users.js        # Users & sessions (scrypt password hashing)
 ├── routes/
 │   ├── courses.js      # /courses CRUD
 │   └── lessons.js      # /courses/:courseId/lessons CRUD (nested)
 ├── middleware/
-│   └── validate.js     # schema-driven request-body validation
+│   ├── validate.js     # schema-driven request-body validation
+│   └── auth.js         # Bearer-token auth guard
 ├── lib/
 │   └── query.js        # query-string param validators (pagination, enums)
 ├── tests/
@@ -103,6 +108,22 @@ Failures return `400 { "error": "..." }`. Malformed JSON also returns a clean
 Interactive documentation is available at **`/docs`** (Swagger UI), backed by
 the OpenAPI 3 spec served at **`/openapi.json`**. Start the server and open
 [http://localhost:3000/docs](http://localhost:3000/docs).
+
+### Authentication
+
+Reads are public; **writes require a logged-in user**. Register or log in to get
+a session token, then send it as `Authorization: Bearer <token>`. Passwords are
+hashed with scrypt; tokens are opaque random strings stored server-side.
+
+| Method | Path             | Description                          |
+| ------ | ---------------- | ------------------------------------ |
+| POST   | `/auth/register` | Create an account, returns a token   |
+| POST   | `/auth/login`    | Log in, returns a token              |
+| POST   | `/auth/logout`   | Invalidate the current token         |
+| GET    | `/auth/me`       | Get the authenticated user           |
+
+Write endpoints (`POST`/`PUT`/`DELETE` on courses & lessons, and reorder)
+return `401` without a valid token.
 
 | Method | Path                               | Description       |
 | ------ | ---------------------------------- | ----------------- |

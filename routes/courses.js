@@ -8,6 +8,7 @@ import {
   deleteCourse,
 } from "../data/store.js";
 import { validateBody } from "../middleware/validate.js";
+import { requireAuth } from "../middleware/auth.js";
 import { parsePageParam, parseEnumParam } from "../lib/query.js";
 import lessonsRouter from "./lessons.js";
 
@@ -66,13 +67,13 @@ router.get("/:id", (req, res) => {
 });
 
 // Create a course
-router.post("/", validateBody(courseCreateSchema), (req, res) => {
+router.post("/", requireAuth, validateBody(courseCreateSchema), (req, res) => {
   const course = createCourse(req.body);
   res.status(201).json(course);
 });
 
 // Update a course
-router.put("/:id", validateBody(courseUpdateSchema), (req, res) => {
+router.put("/:id", requireAuth, validateBody(courseUpdateSchema), (req, res) => {
   const course = updateCourse(req.params.id, req.body);
   if (!course) {
     return res.status(404).json({ error: "Course not found" });
@@ -81,7 +82,7 @@ router.put("/:id", validateBody(courseUpdateSchema), (req, res) => {
 });
 
 // Delete a course
-router.delete("/:id", (req, res) => {
+router.delete("/:id", requireAuth, (req, res) => {
   const removed = deleteCourse(req.params.id);
   if (!removed) {
     return res.status(404).json({ error: "Course not found" });

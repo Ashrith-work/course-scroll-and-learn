@@ -11,6 +11,7 @@ process.env.DB_PATH = dbPath;
 
 let server;
 let baseURL;
+let authToken = null;
 
 before(async () => {
   const { default: app } = await import("../index.js");
@@ -20,6 +21,14 @@ before(async () => {
       resolve();
     });
   });
+  // Register a default user; req() sends this token so write tests are authed.
+  const res = await req(
+    "POST",
+    "/auth/register",
+    { username: "tester", password: "password123" },
+    { auth: false }
+  );
+  authToken = (await res.json()).token;
 });
 
 after(async () => {
@@ -32,12 +41,16 @@ after(async () => {
   }
 });
 
-function req(method, path, body) {
+// By default, authenticated requests carry the default user's token. Pass
+// { auth: false } to send no Authorization header, or { token } for a specific one.
+function req(method, path, body, { auth = true, token } = {}) {
   const opts = { method, headers: {} };
   if (body !== undefined) {
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
   }
+  const bearer = token ?? (auth ? authToken : null);
+  if (bearer) opts.headers["Authorization"] = `Bearer ${bearer}`;
   return fetch(baseURL + path, opts);
 }
 
@@ -64,10 +77,20 @@ test("GET /openapi.json serves a valid OpenAPI 3 document", async () => {
   assert.match(spec.openapi, /^3\./);
   assert.equal(spec.info.title, "Course Scroll and Learn API");
   // Spot-check that key paths are documented.
-  for (const path of ["/health", "/courses", "/courses/{id}", "/courses/{courseId}/lessons"]) {
+  for (const path of [
+    "/health",
+    "/courses",
+    "/courses/{id}",
+    "/courses/{courseId}/lessons",
+    "/auth/register",
+    "/auth/login",
+  ]) {
     assert.ok(spec.paths[path], `missing path ${path}`);
   }
   assert.ok(spec.components.schemas.Course);
+  // Auth is documented as a bearer security scheme, and writes require it.
+  assert.equal(spec.components.securitySchemes.bearerAuth.scheme, "bearer");
+  assert.ok(spec.paths["/courses"].post.security);
 });
 
 test("GET /docs serves the Swagger UI page", async () => {
@@ -77,6 +100,123 @@ test("GET /docs serves the Swagger UI page", async () => {
   const html = await res.text();
   assert.match(html, /swagger-ui/);
   assert.match(html, /\/openapi\.json/);
+});
+
+// --- Auth ---
+
+test("POST /auth/register creates a user and returns a token", async () => {
+  const res = await req(
+    "POST",
+    "/auth/register",
+    { username: "alice", password: "supersecret" },
+    { auth: false }
+  );
+  assert.equal(res.status, 201);
+  const data = await res.json();
+  assert.equal(data.user.username, "alice");
+  assert.ok(typeof data.token === "string" && data.token.length > 0);
+  // Secrets must never be returned.
+  assert.equal(data.user.password, undefined);
+  assert.equal(data.user.password_hash, undefined);
+});
+
+test("registering a duplicate username returns 409", async () => {
+  await req("POST", "/auth/register", { username: "bob", password: "supersecret" }, { auth: false });
+  const res = await req(
+    "POST",
+    "/auth/register",
+    { username: "bob", password: "supersecret" },
+    { auth: false }
+  );
+  assert.equal(res.status, 409);
+  assert.match((await res.json()).error, /already taken/);
+});
+
+test("registering with a short password returns 400", async () => {
+  const res = await req(
+    "POST",
+    "/auth/register",
+    { username: "shorty", password: "123" },
+    { auth: false }
+  );
+  assert.equal(res.status, 400);
+});
+
+test("login with correct credentials returns a token", async () => {
+  await req("POST", "/auth/register", { username: "carol", password: "supersecret" }, { auth: false });
+  const res = await req(
+    "POST",
+    "/auth/login",
+    { username: "carol", password: "supersecret" },
+    { auth: false }
+  );
+  assert.equal(res.status, 200);
+  assert.ok((await res.json()).token);
+});
+
+test("login with a wrong password returns 401", async () => {
+  await req("POST", "/auth/register", { username: "dave", password: "supersecret" }, { auth: false });
+  const res = await req(
+    "POST",
+    "/auth/login",
+    { username: "dave", password: "wrongpassword" },
+    { auth: false }
+  );
+  assert.equal(res.status, 401);
+});
+
+test("login for an unknown user returns 401", async () => {
+  const res = await req(
+    "POST",
+    "/auth/login",
+    { username: "ghost", password: "supersecret" },
+    { auth: false }
+  );
+  assert.equal(res.status, 401);
+});
+
+test("GET /auth/me returns the current user", async () => {
+  const res = await req("GET", "/auth/me");
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).user.username, "tester");
+});
+
+test("GET /auth/me without a token returns 401", async () => {
+  const res = await req("GET", "/auth/me", undefined, { auth: false });
+  assert.equal(res.status, 401);
+});
+
+test("logout invalidates the token", async () => {
+  const reg = await (
+    await req("POST", "/auth/register", { username: "frank", password: "supersecret" }, { auth: false })
+  ).json();
+  const out = await req("POST", "/auth/logout", undefined, { token: reg.token });
+  assert.equal(out.status, 200);
+  const me = await req("GET", "/auth/me", undefined, { token: reg.token });
+  assert.equal(me.status, 401);
+});
+
+// --- Auth enforcement on writes ---
+
+test("listing courses works without auth", async () => {
+  const res = await req("GET", "/courses", undefined, { auth: false });
+  assert.equal(res.status, 200);
+});
+
+test("creating a course without auth returns 401", async () => {
+  const res = await req("POST", "/courses", { title: "Nope" }, { auth: false });
+  assert.equal(res.status, 401);
+  assert.match((await res.json()).error, /authentication required/);
+});
+
+test("creating a lesson without auth returns 401", async () => {
+  const res = await req("POST", "/courses/1/lessons", { title: "Nope" }, { auth: false });
+  assert.equal(res.status, 401);
+});
+
+test("reordering lessons without auth returns 401", async () => {
+  const res = await req("PUT", "/courses/1/lessons/reorder", { order: [1, 2] }, { auth: false });
+  assert.equal(res.status, 401);
 });
 
 // --- Courses ---
