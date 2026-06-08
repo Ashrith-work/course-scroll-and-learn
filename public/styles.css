@@ -191,7 +191,14 @@ body:not(.authed) .needs-auth {
   font-size: clamp(16px, 2.6vw, 20px);
   color: var(--muted);
   max-width: 38ch;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+}
+
+.card__owner {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 20px;
 }
 
 .card__actions {

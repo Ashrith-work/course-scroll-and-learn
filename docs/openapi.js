@@ -13,6 +13,8 @@ const Course = {
     id: { type: "integer", example: 1 },
     title: { type: "string", example: "Intro to JavaScript" },
     description: { type: "string", example: "Learn the basics of JS" },
+    userId: { type: "integer", nullable: true, description: "Owner's user id (null for seeded courses)." },
+    owner: { type: "string", nullable: true, description: "Owner's username (null for seeded courses)." },
   },
   required: ["id", "title", "description"],
 };
@@ -109,6 +111,11 @@ const secured = [{ bearerAuth: [] }];
 
 const tooManyRequests = {
   description: "Rate limit exceeded",
+  content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+};
+
+const forbidden = {
+  description: "Authenticated but not the owner",
   content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
 };
 
@@ -340,6 +347,7 @@ export const openapi = {
             content: { "application/json": { schema: { $ref: "#/components/schemas/Course" } } },
           },
           400: badRequest,
+          403: forbidden,
           404: notFound,
         },
       },
@@ -353,6 +361,7 @@ export const openapi = {
             description: "The deleted course",
             content: { "application/json": { schema: { $ref: "#/components/schemas/Course" } } },
           },
+          403: forbidden,
           404: notFound,
         },
       },
@@ -406,6 +415,7 @@ export const openapi = {
             content: { "application/json": { schema: { $ref: "#/components/schemas/Lesson" } } },
           },
           400: badRequest,
+          403: forbidden,
           404: notFound,
         },
       },
@@ -433,6 +443,7 @@ export const openapi = {
             },
           },
           400: badRequest,
+          403: forbidden,
           404: notFound,
         },
       },
@@ -465,6 +476,7 @@ export const openapi = {
             content: { "application/json": { schema: { $ref: "#/components/schemas/Lesson" } } },
           },
           400: badRequest,
+          403: forbidden,
           404: notFound,
         },
       },
@@ -478,6 +490,7 @@ export const openapi = {
             description: "The deleted lesson",
             content: { "application/json": { schema: { $ref: "#/components/schemas/Lesson" } } },
           },
+          403: forbidden,
           404: notFound,
         },
       },

@@ -16,6 +16,7 @@ process.env.AUTH_RATELIMIT_MAX = "10000";
 let server;
 let baseURL;
 let authToken = null;
+let testerUserId = null;
 
 before(async () => {
   const { default: app } = await import("../index.js");
@@ -32,7 +33,9 @@ before(async () => {
     { username: "tester", password: "password123" },
     { auth: false }
   );
-  authToken = (await res.json()).token;
+  const data = await res.json();
+  authToken = data.token;
+  testerUserId = data.user.id;
 });
 
 after(async () => {
@@ -562,18 +565,21 @@ test("POST lesson auto-assigns the next order", async () => {
 });
 
 test("POST lesson without a title returns 400", async () => {
-  const res = await req("POST", "/courses/1/lessons", { content: "no title" });
+  const course = await (await req("POST", "/courses", { title: "Validate lessons" })).json();
+  const res = await req("POST", `/courses/${course.id}/lessons`, { content: "no title" });
   assert.equal(res.status, 400);
 });
 
 test("POST lesson with a non-integer order returns 400", async () => {
-  const res = await req("POST", "/courses/1/lessons", { title: "Bad order", order: "abc" });
+  const course = await (await req("POST", "/courses", { title: "Validate order" })).json();
+  const res = await req("POST", `/courses/${course.id}/lessons`, { title: "Bad order", order: "abc" });
   assert.equal(res.status, 400);
   assert.equal((await res.json()).error, "order must be an integer");
 });
 
 test("POST lesson with order below the minimum returns 400", async () => {
-  const res = await req("POST", "/courses/1/lessons", { title: "Zero order", order: 0 });
+  const course = await (await req("POST", "/courses", { title: "Validate min" })).json();
+  const res = await req("POST", `/courses/${course.id}/lessons`, { title: "Zero order", order: 0 });
   assert.equal(res.status, 400);
   assert.match((await res.json()).error, />= 1/);
 });
@@ -674,7 +680,8 @@ test("reorder with a foreign lesson id returns 400", async () => {
 });
 
 test("reorder with a non-array body returns 400", async () => {
-  const res = await req("PUT", "/courses/1/lessons/reorder", { order: "nope" });
+  const { course } = await makeCourseWithLessons("Reorder bad body", ["A"]);
+  const res = await req("PUT", `/courses/${course.id}/lessons/reorder`, { order: "nope" });
   assert.equal(res.status, 400);
   assert.match((await res.json()).error, /non-empty array/);
 });
@@ -683,4 +690,65 @@ test("reorder for an unknown course returns 404", async () => {
   const res = await req("PUT", "/courses/999999/lessons/reorder", { order: [1] });
   assert.equal(res.status, 404);
   assert.equal((await res.json()).error, "Course not found");
+});
+
+// --- Course ownership ---
+
+// Register a second user and return their bearer token.
+async function makeOtherUser(username) {
+  const res = await req(
+    "POST",
+    "/auth/register",
+    { username, password: "password123" },
+    { auth: false }
+  );
+  return (await res.json()).token;
+}
+
+test("a created course is owned by its creator", async () => {
+  const course = await (await req("POST", "/courses", { title: "Owned" })).json();
+  assert.equal(course.userId, testerUserId);
+  assert.equal(course.owner, "tester");
+});
+
+test("a non-owner cannot update another user's course (403)", async () => {
+  const course = await (await req("POST", "/courses", { title: "Tester's course" })).json();
+  const otherToken = await makeOtherUser("mallory");
+  const res = await req("PUT", `/courses/${course.id}`, { title: "Hijacked" }, { token: otherToken });
+  assert.equal(res.status, 403);
+  assert.match((await res.json()).error, /do not own/);
+});
+
+test("a non-owner cannot delete another user's course (403)", async () => {
+  const course = await (await req("POST", "/courses", { title: "Tester's course 2" })).json();
+  const otherToken = await makeOtherUser("oscar");
+  const res = await req("DELETE", `/courses/${course.id}`, undefined, { token: otherToken });
+  assert.equal(res.status, 403);
+});
+
+test("a non-owner cannot add lessons to another user's course (403)", async () => {
+  const course = await (await req("POST", "/courses", { title: "Tester's course 3" })).json();
+  const otherToken = await makeOtherUser("peggy");
+  const res = await req(
+    "POST",
+    `/courses/${course.id}/lessons`,
+    { title: "Sneaky" },
+    { token: otherToken }
+  );
+  assert.equal(res.status, 403);
+});
+
+test("the owner can update and delete their own course", async () => {
+  const course = await (await req("POST", "/courses", { title: "Mine" })).json();
+  const upd = await req("PUT", `/courses/${course.id}`, { title: "Mine (edited)" });
+  assert.equal(upd.status, 200);
+  assert.equal((await upd.json()).title, "Mine (edited)");
+  const del = await req("DELETE", `/courses/${course.id}`);
+  assert.equal(del.status, 200);
+});
+
+test("seeded (unowned) courses cannot be edited by anyone (403)", async () => {
+  // Seeded course 1 has no owner, so even an authenticated user gets 403.
+  const res = await req("PUT", "/courses/1", { title: "Cannot" });
+  assert.equal(res.status, 403);
 });

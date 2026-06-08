@@ -148,6 +148,12 @@ hashed with scrypt; tokens are opaque random strings stored server-side.
 Write endpoints (`POST`/`PUT`/`DELETE` on courses & lessons, and reorder)
 return `401` without a valid token.
 
+**Ownership:** each course is owned by the user who created it (returned as
+`userId` / `owner`). Only the owner may update or delete a course or modify its
+lessons — others get `403`. Reads remain public. Seeded courses have no owner
+and are read-only. In the UI, edit/delete and lesson-write controls appear only
+on courses you own.
+
 `/auth/login` and `/auth/register` are **rate limited per IP** (in-memory fixed
 window) to slow brute-force and signup abuse. Exceeding the limit returns `429`
 with a `Retry-After` header; responses include `RateLimit-*` headers. Tune with
