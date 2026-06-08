@@ -285,6 +285,54 @@ test("GET /courses/:id/lessons returns seeded lessons sorted by order", async ()
   assert.ok(lessons.every((l) => l.courseId === 1));
 });
 
+// Course 1 seeded lessons: id 1 "Variables and Types" (order 1,
+// content "let, const, and primitives"), id 2 "Functions" (order 2).
+test("lesson search filters by title", async () => {
+  const lessons = await (await req("GET", "/courses/1/lessons?q=Functions")).json();
+  assert.equal(lessons.length, 1);
+  assert.equal(lessons[0].id, 2);
+});
+
+test("lesson search filters by content", async () => {
+  const lessons = await (await req("GET", "/courses/1/lessons?q=primitives")).json();
+  assert.equal(lessons.length, 1);
+  assert.equal(lessons[0].id, 1);
+});
+
+test("lesson search with no matches returns an empty array", async () => {
+  const lessons = await (await req("GET", "/courses/1/lessons?q=nope")).json();
+  assert.deepEqual(lessons, []);
+});
+
+test("lessons sort by title", async () => {
+  // "Functions" (id 2) before "Variables and Types" (id 1).
+  const lessons = await (await req("GET", "/courses/1/lessons?sort=title")).json();
+  assert.deepEqual(
+    lessons.map((l) => l.id),
+    [2, 1]
+  );
+});
+
+test("lessons sort by order descending", async () => {
+  const lessons = await (await req("GET", "/courses/1/lessons?sort=order&order=desc")).json();
+  assert.deepEqual(
+    lessons.map((l) => l.id),
+    [2, 1]
+  );
+});
+
+test("lesson list with an invalid sort returns 400", async () => {
+  const res = await req("GET", "/courses/1/lessons?sort=bogus");
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /sort must be one of/);
+});
+
+test("lesson list with an invalid order returns 400", async () => {
+  const res = await req("GET", "/courses/1/lessons?order=sideways");
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /order must be one of/);
+});
+
 test("GET lessons for unknown course returns 404", async () => {
   const res = await req("GET", "/courses/9999/lessons");
   assert.equal(res.status, 404);
