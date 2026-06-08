@@ -1,5 +1,7 @@
 # Course Scroll and Learn
 
+[![CI](https://github.com/Ashrith-work/course-scroll-and-learn/actions/workflows/ci.yml/badge.svg)](https://github.com/Ashrith-work/course-scroll-and-learn/actions/workflows/ci.yml)
+
 A course scroll and learn application.
 
 ## Getting Started
@@ -114,14 +116,8 @@ npm test
 
 `.github/workflows/ci.yml` runs the test suite on every push and pull request
 to `main`, across Node 20 and 22. It installs with `npm ci` (which compiles the
-`better-sqlite3` native module) and runs `npm test`.
-
-Once this repo is pushed to GitHub, add a status badge by replacing
-`OWNER/REPO` below and pasting it near the top of this file:
-
-```
-![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)
-```
+`better-sqlite3` native module) and runs `npm test`. The build status is shown
+by the badge at the top of this file.
 
 ## License
 
