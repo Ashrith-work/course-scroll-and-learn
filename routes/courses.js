@@ -8,34 +8,13 @@ import {
   deleteCourse,
 } from "../data/store.js";
 import { validateBody } from "../middleware/validate.js";
+import { parsePageParam, parseEnumParam } from "../lib/query.js";
 import lessonsRouter from "./lessons.js";
 
 const router = Router();
 
-// Parse an optional non-negative-integer query param within [min, max].
-// Returns { value } (value is undefined when the param is absent) or { error }.
-function parsePageParam(raw, name, { min, max }) {
-  if (raw === undefined) return { value: undefined };
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n < min || (max !== undefined && n > max)) {
-    const range = max !== undefined ? `between ${min} and ${max}` : `>= ${min}`;
-    return { error: `${name} must be an integer ${range}` };
-  }
-  return { value: n };
-}
-
 const SORT_FIELDS = ["id", "title"];
 const SORT_ORDERS = ["asc", "desc"];
-
-// Validate an optional query param against an allowed set.
-// Returns { value } (undefined when absent) or { error }.
-function parseEnumParam(raw, name, allowed) {
-  if (raw === undefined) return { value: undefined };
-  if (!allowed.includes(raw)) {
-    return { error: `${name} must be one of: ${allowed.join(", ")}` };
-  }
-  return { value: raw };
-}
 
 const courseCreateSchema = {
   title: { type: "string", required: true, maxLength: 200 },

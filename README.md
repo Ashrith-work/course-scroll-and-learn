@@ -47,6 +47,9 @@ next page (`?limit=&offset=`) as you near the bottom, using the
 `X-Total-Count` header to know when to stop. A **sort dropdown** (oldest/newest
 first, title A–Z/Z–A) reorders the feed via `?sort=&order=`.
 
+Inside an expanded course, the lessons list has its own **search box and sort
+dropdown** (by order or title), backed by `GET /courses/:id/lessons?q=&sort=&order=`.
+
 ## Project Structure
 
 ```
@@ -64,6 +67,8 @@ first, title A–Z/Z–A) reorders the feed via `?sort=&order=`.
 │   └── lessons.js      # /courses/:courseId/lessons CRUD (nested)
 ├── middleware/
 │   └── validate.js     # schema-driven request-body validation
+├── lib/
+│   └── query.js        # query-string param validators (pagination, enums)
 ├── tests/
 │   └── api.test.js     # API tests (node --test)
 ├── package.json        # Project metadata and scripts
@@ -96,7 +101,7 @@ Failures return `400 { "error": "..." }`. Malformed JSON also returns a clean
 | POST   | `/courses`                         | Create a course   |
 | PUT    | `/courses/:id`                     | Update a course   |
 | DELETE | `/courses/:id`                     | Delete a course (cascades to lessons) |
-| GET    | `/courses/:courseId/lessons`       | List lessons      |
+| GET    | `/courses/:courseId/lessons`       | List lessons. Optional `?q=` search (title/content) and `?sort=` (`order`\|`title`\|`id`) / `?order=` (`asc`\|`desc`) sorting. |
 | GET    | `/courses/:courseId/lessons/:id`   | Get a lesson      |
 | POST   | `/courses/:courseId/lessons`       | Create a lesson   |
 | PUT    | `/courses/:courseId/lessons/:id`   | Update a lesson   |

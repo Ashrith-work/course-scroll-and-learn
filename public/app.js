@@ -136,7 +136,7 @@ function openCourseForm(course) {
 
 // --- Lesson forms ---
 
-function openLessonForm(courseId, lesson, box) {
+function openLessonForm(courseId, lesson, onDone) {
   const isEdit = Boolean(lesson);
   openForm({
     title: isEdit ? "Edit lesson" : "New lesson",
@@ -153,34 +153,42 @@ function openLessonForm(courseId, lesson, box) {
       } else {
         await api("POST", `/courses/${courseId}/lessons`, body);
       }
-      await refreshLessons(box, courseId);
+      await onDone();
     },
   });
 }
 
 // --- Lessons rendering ---
 
-async function refreshLessons(box, courseId) {
-  box.innerHTML = "";
+const LESSON_SORTS = [
+  ["order:asc", "Order ↑"],
+  ["order:desc", "Order ↓"],
+  ["title:asc", "Title A–Z"],
+  ["title:desc", "Title Z–A"],
+];
 
-  const addBtn = el("button", "mini-btn", "+ Add lesson");
-  addBtn.addEventListener("click", () => openLessonForm(courseId, null, box));
-  box.appendChild(addBtn);
+// Fetch and render the lesson list into `list`, using `state` for the current
+// search/sort. `renderList` re-runs this so edits/deletes refresh in place.
+async function fillLessonList(list, courseId, state, renderList) {
+  list.innerHTML = "";
+
+  const params = new URLSearchParams({ sort: state.sort, order: state.order });
+  if (state.q) params.set("q", state.q);
 
   let lessons;
   try {
-    lessons = await api("GET", `/courses/${courseId}/lessons`);
+    lessons = await api("GET", `/courses/${courseId}/lessons?${params}`);
   } catch (err) {
-    box.appendChild(el("p", "empty", `Failed to load: ${err.message}`));
+    list.appendChild(el("p", "empty", `Failed to load: ${err.message}`));
     return;
   }
 
   if (lessons.length === 0) {
-    box.appendChild(el("p", "empty", "No lessons yet."));
+    list.appendChild(el("p", "empty", state.q ? "No lessons match." : "No lessons yet."));
     return;
   }
 
-  const list = el("ul", "lessons");
+  const ul = el("ul", "lessons");
   for (const lesson of lessons) {
     const li = el("li");
 
@@ -190,14 +198,14 @@ async function refreshLessons(box, courseId) {
     const actions = el("div", "lesson__actions");
     const editBtn = el("button", "icon-btn", "✏️");
     editBtn.title = "Edit lesson";
-    editBtn.addEventListener("click", () => openLessonForm(courseId, lesson, box));
+    editBtn.addEventListener("click", () => openLessonForm(courseId, lesson, renderList));
     const delBtn = el("button", "icon-btn", "🗑️");
     delBtn.title = "Delete lesson";
     delBtn.addEventListener("click", () =>
       withAlert(async () => {
         if (!confirm(`Delete lesson "${lesson.title}"?`)) return;
         await api("DELETE", `/courses/${courseId}/lessons/${lesson.id}`);
-        await refreshLessons(box, courseId);
+        await renderList();
       })
     );
     actions.append(editBtn, delBtn);
@@ -207,9 +215,61 @@ async function refreshLessons(box, courseId) {
     if (lesson.content) {
       li.appendChild(el("div", "lesson__content", lesson.content));
     }
-    list.appendChild(li);
+    ul.appendChild(li);
   }
+  list.appendChild(ul);
+}
+
+async function refreshLessons(box, courseId) {
+  box.innerHTML = "";
+
+  // Per-box state survives toggling the list closed/open within a session.
+  const state = box._lessonState ?? (box._lessonState = { q: "", sort: "order", order: "asc" });
+
+  const controls = el("div", "lesson-controls");
+
+  const addBtn = el("button", "mini-btn", "+ Add lesson");
+
+  const search = el("input", "lesson-search");
+  search.type = "search";
+  search.placeholder = "Search lessons…";
+  search.value = state.q;
+  search.setAttribute("aria-label", "Search lessons");
+  search.autocomplete = "off";
+
+  const sort = document.createElement("select");
+  sort.className = "lesson-sort";
+  sort.setAttribute("aria-label", "Sort lessons");
+  for (const [value, label] of LESSON_SORTS) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    sort.appendChild(opt);
+  }
+  sort.value = `${state.sort}:${state.order}`;
+
+  controls.append(addBtn, search, sort);
+  box.appendChild(controls);
+
+  const list = el("div", "lesson-list");
   box.appendChild(list);
+
+  const renderList = () => fillLessonList(list, courseId, state, renderList);
+
+  addBtn.addEventListener("click", () => openLessonForm(courseId, null, renderList));
+
+  let timer;
+  search.addEventListener("input", () => {
+    state.q = search.value.trim();
+    clearTimeout(timer);
+    timer = setTimeout(renderList, 250);
+  });
+  sort.addEventListener("change", () => {
+    [state.sort, state.order] = sort.value.split(":");
+    renderList();
+  });
+
+  await renderList();
 }
 
 // --- Course card ---

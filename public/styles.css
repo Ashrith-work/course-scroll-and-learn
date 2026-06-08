@@ -243,11 +243,56 @@ body {
   padding: 8px 14px;
   border-radius: 999px;
   cursor: pointer;
-  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .mini-btn:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+.lesson-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  max-width: 46ch;
+}
+
+.lesson-search,
+.lesson-sort {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 7px 12px;
+}
+
+.lesson-search {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.lesson-sort {
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.lesson-search::placeholder {
+  color: var(--muted);
+}
+
+.lesson-search:focus,
+.lesson-sort:focus {
+  outline: none;
+  border-color: #818cf8;
+}
+
+.lesson-sort option {
+  background: #1b1d33;
+  color: var(--text);
 }
 
 .lessons .empty,

@@ -95,9 +95,6 @@ export function deleteCourse(id) {
 
 // --- Lessons ---
 
-const selectLessons = db.prepare(
-  'SELECT id, course_id AS courseId, title, content, "order" FROM lessons WHERE course_id = ? ORDER BY "order", id'
-);
 const selectLesson = db.prepare(
   'SELECT id, course_id AS courseId, title, content, "order" FROM lessons WHERE id = ? AND course_id = ?'
 );
@@ -110,8 +107,40 @@ const updateLessonStmt = db.prepare(
 const deleteLessonStmt = db.prepare("DELETE FROM lessons WHERE id = ? AND course_id = ?");
 const countLessons = db.prepare("SELECT COUNT(*) AS n FROM lessons WHERE course_id = ?");
 
-export function listLessons(courseId) {
-  return selectLessons.all(Number(courseId));
+// Whitelisted sort columns for lessons (see SORT_DIRECTIONS above).
+const LESSON_SORT_COLUMNS = { order: '"order"', title: "title COLLATE NOCASE", id: "id" };
+
+const lessonStmtCache = new Map();
+function lessonsStmt(hasSearch, sortExpr, dir) {
+  const key = `${hasSearch}|${sortExpr}|${dir}`;
+  let stmt = lessonStmtCache.get(key);
+  if (!stmt) {
+    const searchWhere = hasSearch
+      ? `AND (title LIKE @like ESCAPE '\\' OR content LIKE @like ESCAPE '\\')`
+      : "";
+    stmt = db.prepare(
+      `SELECT id, course_id AS courseId, title, content, "order" FROM lessons
+       WHERE course_id = @courseId ${searchWhere}
+       ORDER BY ${sortExpr} ${dir}, id ${dir}`
+    );
+    lessonStmtCache.set(key, stmt);
+  }
+  return stmt;
+}
+
+// List a course's lessons, optionally filtered by title/content search and
+// sorted. Defaults to order ASC (the previous behavior).
+export function listLessons(courseId, { search, sort, order } = {}) {
+  const term = typeof search === "string" ? search.trim() : "";
+  const sortExpr = LESSON_SORT_COLUMNS[sort] ?? LESSON_SORT_COLUMNS.order;
+  const dir = SORT_DIRECTIONS[order] ?? SORT_DIRECTIONS.asc;
+  const params = { courseId: Number(courseId) };
+
+  const stmt = lessonsStmt(term !== "", sortExpr, dir);
+  if (term === "") {
+    return stmt.all(params);
+  }
+  return stmt.all({ ...params, like: searchLike(term) });
 }
 
 export function findLesson(courseId, lessonId) {

@@ -8,9 +8,13 @@ import {
   deleteLesson,
 } from "../data/store.js";
 import { validateBody } from "../middleware/validate.js";
+import { parseEnumParam } from "../lib/query.js";
 
 // mergeParams lets us read :courseId from the parent (courses) router.
 const router = Router({ mergeParams: true });
+
+const LESSON_SORT_FIELDS = ["order", "title", "id"];
+const SORT_ORDERS = ["asc", "desc"];
 
 const lessonCreateSchema = {
   title: { type: "string", required: true, maxLength: 200 },
@@ -34,9 +38,17 @@ router.use((req, res, next) => {
   next();
 });
 
-// List lessons for a course
+// List lessons for a course. Optional ?q= search (title/content) and
+// ?sort= (order|title|id) / ?order= (asc|desc) sorting.
 router.get("/", (req, res) => {
-  res.json(listLessons(req.course.id));
+  const { q } = req.query;
+  const search = typeof q === "string" ? q : undefined;
+  const sort = parseEnumParam(req.query.sort, "sort", LESSON_SORT_FIELDS);
+  const order = parseEnumParam(req.query.order, "order", SORT_ORDERS);
+  for (const p of [sort, order]) {
+    if (p.error) return res.status(400).json({ error: p.error });
+  }
+  res.json(listLessons(req.course.id, { search, sort: sort.value, order: order.value }));
 });
 
 // Get a single lesson
