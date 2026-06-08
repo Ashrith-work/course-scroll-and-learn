@@ -45,6 +45,24 @@ The image is a multi-stage build on `node:22-slim`, runs as the non-root
 to persist it), and ships a `HEALTHCHECK` that probes `/health`. Configure via
 the `PORT` and `DB_PATH` environment variables.
 
+## Deploy to Render
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Ashrith-work/course-scroll-and-learn)
+
+A [`render.yaml`](./render.yaml) Blueprint is included. From the Render
+dashboard: **New + → Blueprint → connect this repo**; Render reads the file and
+builds the Docker image.
+
+- **Default (free, ephemeral):** the database lives inside the container and
+  re-seeds on each deploy/restart — ideal for a public demo link.
+- **Persistent:** switch to a paid `plan` and uncomment the `disk:` block in
+  `render.yaml` (see the notes there, including disk permissions for the
+  non-root container).
+
+`TRUST_PROXY=1` is set so per-IP rate limiting uses the real client IP behind
+Render's proxy. Environment variables: `PORT` (set by Render), `DB_PATH`,
+`TRUST_PROXY`, `AUTH_RATELIMIT_MAX`, `AUTH_RATELIMIT_WINDOW_MS`.
+
 ## Frontend
 
 A dependency-free static frontend (served from `public/`) presents courses as a
