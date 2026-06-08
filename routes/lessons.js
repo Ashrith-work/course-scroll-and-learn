@@ -1,5 +1,12 @@
 import { Router } from "express";
-import { lessons, nextLessonId, findCourse } from "../data/store.js";
+import {
+  findCourse,
+  listLessons,
+  findLesson,
+  createLesson,
+  updateLesson,
+  deleteLesson,
+} from "../data/store.js";
 
 // mergeParams lets us read :courseId from the parent (courses) router.
 const router = Router({ mergeParams: true });
@@ -14,23 +21,14 @@ router.use((req, res, next) => {
   next();
 });
 
-function lessonsForCourse(courseId) {
-  return lessons
-    .filter((l) => l.courseId === Number(courseId))
-    .sort((a, b) => a.order - b.order);
-}
-
 // List lessons for a course
 router.get("/", (req, res) => {
-  res.json(lessonsForCourse(req.course.id));
+  res.json(listLessons(req.course.id));
 });
 
 // Get a single lesson
 router.get("/:lessonId", (req, res) => {
-  const lessonId = Number(req.params.lessonId);
-  const lesson = lessons.find(
-    (l) => l.id === lessonId && l.courseId === req.course.id
-  );
+  const lesson = findLesson(req.course.id, req.params.lessonId);
   if (!lesson) {
     return res.status(404).json({ error: "Lesson not found" });
   }
@@ -43,43 +41,26 @@ router.post("/", (req, res) => {
   if (!title) {
     return res.status(400).json({ error: "title is required" });
   }
-  const lesson = {
-    id: nextLessonId(),
-    courseId: req.course.id,
-    title,
-    content: content ?? "",
-    order: order ?? lessonsForCourse(req.course.id).length + 1,
-  };
-  lessons.push(lesson);
+  const lesson = createLesson(req.course.id, { title, content, order });
   res.status(201).json(lesson);
 });
 
 // Update a lesson
 router.put("/:lessonId", (req, res) => {
-  const lessonId = Number(req.params.lessonId);
-  const lesson = lessons.find(
-    (l) => l.id === lessonId && l.courseId === req.course.id
-  );
+  const { title, content, order } = req.body ?? {};
+  const lesson = updateLesson(req.course.id, req.params.lessonId, { title, content, order });
   if (!lesson) {
     return res.status(404).json({ error: "Lesson not found" });
   }
-  const { title, content, order } = req.body ?? {};
-  if (title !== undefined) lesson.title = title;
-  if (content !== undefined) lesson.content = content;
-  if (order !== undefined) lesson.order = order;
   res.json(lesson);
 });
 
 // Delete a lesson
 router.delete("/:lessonId", (req, res) => {
-  const lessonId = Number(req.params.lessonId);
-  const index = lessons.findIndex(
-    (l) => l.id === lessonId && l.courseId === req.course.id
-  );
-  if (index === -1) {
+  const removed = deleteLesson(req.course.id, req.params.lessonId);
+  if (!removed) {
     return res.status(404).json({ error: "Lesson not found" });
   }
-  const [removed] = lessons.splice(index, 1);
   res.json(removed);
 });
 
