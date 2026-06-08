@@ -9,6 +9,10 @@ import { rmSync } from "node:fs";
 const dbPath = join(tmpdir(), `courses-test-${process.pid}-${Date.now()}.db`);
 process.env.DB_PATH = dbPath;
 
+// Raise the auth rate limit so the many auth calls in this suite never trip it.
+// The limiter's own behavior is covered by tests/rateLimit.test.js.
+process.env.AUTH_RATELIMIT_MAX = "10000";
+
 let server;
 let baseURL;
 let authToken = null;
@@ -184,6 +188,18 @@ test("GET /auth/me returns the current user", async () => {
 test("GET /auth/me without a token returns 401", async () => {
   const res = await req("GET", "/auth/me", undefined, { auth: false });
   assert.equal(res.status, 401);
+});
+
+test("auth endpoints expose rate-limit headers", async () => {
+  // Confirms the limiter is actually mounted on the credential routes.
+  const res = await req(
+    "POST",
+    "/auth/login",
+    { username: "tester", password: "password123" },
+    { auth: false }
+  );
+  assert.ok(res.headers.get("ratelimit-limit"));
+  assert.ok(res.headers.get("ratelimit-remaining"));
 });
 
 test("logout invalidates the token", async () => {
