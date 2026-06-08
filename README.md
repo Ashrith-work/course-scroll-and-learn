@@ -110,6 +110,19 @@ never touched. Run them with:
 npm test
 ```
 
+### Continuous integration
+
+`.github/workflows/ci.yml` runs the test suite on every push and pull request
+to `main`, across Node 20 and 22. It installs with `npm ci` (which compiles the
+`better-sqlite3` native module) and runs `npm test`.
+
+Once this repo is pushed to GitHub, add a status badge by replacing
+`OWNER/REPO` below and pasting it near the top of this file:
+
+```
+![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)
+```
+
 ## License
 
 MIT
