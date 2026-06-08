@@ -56,6 +56,29 @@ test("GET / serves the frontend", async () => {
   assert.match(await res.text(), /Scroll/);
 });
 
+test("GET /openapi.json serves a valid OpenAPI 3 document", async () => {
+  const res = await req("GET", "/openapi.json");
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("content-type"), /application\/json/);
+  const spec = await res.json();
+  assert.match(spec.openapi, /^3\./);
+  assert.equal(spec.info.title, "Course Scroll and Learn API");
+  // Spot-check that key paths are documented.
+  for (const path of ["/health", "/courses", "/courses/{id}", "/courses/{courseId}/lessons"]) {
+    assert.ok(spec.paths[path], `missing path ${path}`);
+  }
+  assert.ok(spec.components.schemas.Course);
+});
+
+test("GET /docs serves the Swagger UI page", async () => {
+  const res = await req("GET", "/docs");
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("content-type"), /text\/html/);
+  const html = await res.text();
+  assert.match(html, /swagger-ui/);
+  assert.match(html, /\/openapi\.json/);
+});
+
 // --- Courses ---
 
 test("GET /courses returns the seeded courses", async () => {

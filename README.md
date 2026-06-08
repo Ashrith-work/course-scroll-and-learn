@@ -59,6 +59,8 @@ dropdown** (by order or title), backed by `GET /courses/:id/lessons?q=&sort=&ord
 │   ├── index.html
 │   ├── styles.css
 │   └── app.js
+├── docs/
+│   └── openapi.js      # OpenAPI 3 spec (served at /openapi.json, UI at /docs)
 ├── data/
 │   ├── db.js           # SQLite connection, schema, and seed
 │   └── store.js        # Repository layer (data access functions)
@@ -93,6 +95,10 @@ Failures return `400 { "error": "..." }`. Malformed JSON also returns a clean
 `400`.
 
 ## API
+
+Interactive documentation is available at **`/docs`** (Swagger UI), backed by
+the OpenAPI 3 spec served at **`/openapi.json`**. Start the server and open
+[http://localhost:3000/docs](http://localhost:3000/docs).
 
 | Method | Path                               | Description       |
 | ------ | ---------------------------------- | ----------------- |
