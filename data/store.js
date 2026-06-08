@@ -106,6 +106,10 @@ const updateLessonStmt = db.prepare(
 );
 const deleteLessonStmt = db.prepare("DELETE FROM lessons WHERE id = ? AND course_id = ?");
 const countLessons = db.prepare("SELECT COUNT(*) AS n FROM lessons WHERE course_id = ?");
+const countLessonsSearch = db.prepare(
+  `SELECT COUNT(*) AS n FROM lessons WHERE course_id = @courseId
+   AND (title LIKE @like ESCAPE '\\' OR content LIKE @like ESCAPE '\\')`
+);
 
 // Whitelisted sort columns for lessons (see SORT_DIRECTIONS above).
 const LESSON_SORT_COLUMNS = { order: '"order"', title: "title COLLATE NOCASE", id: "id" };
@@ -121,26 +125,35 @@ function lessonsStmt(hasSearch, sortExpr, dir) {
     stmt = db.prepare(
       `SELECT id, course_id AS courseId, title, content, "order" FROM lessons
        WHERE course_id = @courseId ${searchWhere}
-       ORDER BY ${sortExpr} ${dir}, id ${dir}`
+       ORDER BY ${sortExpr} ${dir}, id ${dir} LIMIT @limit OFFSET @offset`
     );
     lessonStmtCache.set(key, stmt);
   }
   return stmt;
 }
 
-// List a course's lessons, optionally filtered by title/content search and
-// sorted. Defaults to order ASC (the previous behavior).
-export function listLessons(courseId, { search, sort, order } = {}) {
+// List a course's lessons, optionally filtered by title/content search, sorted,
+// and paginated. Defaults to order ASC, no limit (the previous behavior).
+export function listLessons(courseId, { search, sort, order, limit, offset } = {}) {
   const term = typeof search === "string" ? search.trim() : "";
   const sortExpr = LESSON_SORT_COLUMNS[sort] ?? LESSON_SORT_COLUMNS.order;
   const dir = SORT_DIRECTIONS[order] ?? SORT_DIRECTIONS.asc;
-  const params = { courseId: Number(courseId) };
+  const params = { courseId: Number(courseId), limit: limit ?? -1, offset: offset ?? 0 };
 
   const stmt = lessonsStmt(term !== "", sortExpr, dir);
   if (term === "") {
     return stmt.all(params);
   }
   return stmt.all({ ...params, like: searchLike(term) });
+}
+
+// Total lessons in a course matching the (optional) search term.
+export function countLessonsFor(courseId, search) {
+  const term = typeof search === "string" ? search.trim() : "";
+  if (term === "") {
+    return countLessons.get(Number(courseId)).n;
+  }
+  return countLessonsSearch.get({ courseId: Number(courseId), like: searchLike(term) }).n;
 }
 
 export function findLesson(courseId, lessonId) {

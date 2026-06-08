@@ -2,13 +2,14 @@ import { Router } from "express";
 import {
   findCourse,
   listLessons,
+  countLessonsFor,
   findLesson,
   createLesson,
   updateLesson,
   deleteLesson,
 } from "../data/store.js";
 import { validateBody } from "../middleware/validate.js";
-import { parseEnumParam } from "../lib/query.js";
+import { parseEnumParam, parsePageParam } from "../lib/query.js";
 
 // mergeParams lets us read :courseId from the parent (courses) router.
 const router = Router({ mergeParams: true });
@@ -38,17 +39,31 @@ router.use((req, res, next) => {
   next();
 });
 
-// List lessons for a course. Optional ?q= search (title/content) and
-// ?sort= (order|title|id) / ?order= (asc|desc) sorting.
+// List lessons for a course. Optional ?q= search (title/content),
+// ?sort= (order|title|id) / ?order= (asc|desc) sorting, and ?limit= (1-100) /
+// ?offset= (>=0) pagination. Total match count is in the X-Total-Count header.
 router.get("/", (req, res) => {
   const { q } = req.query;
   const search = typeof q === "string" ? q : undefined;
   const sort = parseEnumParam(req.query.sort, "sort", LESSON_SORT_FIELDS);
   const order = parseEnumParam(req.query.order, "order", SORT_ORDERS);
-  for (const p of [sort, order]) {
+  const limit = parsePageParam(req.query.limit, "limit", { min: 1, max: 100 });
+  const offset = parsePageParam(req.query.offset, "offset", { min: 0 });
+  for (const p of [sort, order, limit, offset]) {
     if (p.error) return res.status(400).json({ error: p.error });
   }
-  res.json(listLessons(req.course.id, { search, sort: sort.value, order: order.value }));
+
+  const total = countLessonsFor(req.course.id, search);
+  const lessons = listLessons(req.course.id, {
+    search,
+    sort: sort.value,
+    order: order.value,
+    limit: limit.value,
+    offset: offset.value,
+  });
+
+  res.set("X-Total-Count", String(total));
+  res.json(lessons);
 });
 
 // Get a single lesson
