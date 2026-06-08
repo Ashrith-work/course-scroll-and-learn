@@ -182,3 +182,35 @@ export function deleteLesson(courseId, lessonId) {
   deleteLessonStmt.run(lesson.id, Number(courseId));
   return lesson;
 }
+
+const lessonIdsStmt = db.prepare("SELECT id FROM lessons WHERE course_id = ?");
+const reorderLessonStmt = db.prepare(
+  'UPDATE lessons SET "order" = ? WHERE id = ? AND course_id = ?'
+);
+
+// Reorder a course's lessons. `ids` must be a permutation of all the course's
+// lesson ids; each lesson's order is set to its 1-based position. Returns
+// { lessons } on success or { error } if the ids don't match exactly.
+export function reorderLessons(courseId, ids) {
+  const cid = Number(courseId);
+  const existing = lessonIdsStmt.all(cid).map((r) => r.id);
+
+  const existingSet = new Set(existing);
+  const seen = new Set();
+  if (ids.length !== existing.length) {
+    return { error: "order must include every lesson exactly once" };
+  }
+  for (const id of ids) {
+    if (!existingSet.has(id) || seen.has(id)) {
+      return { error: "order must include every lesson exactly once" };
+    }
+    seen.add(id);
+  }
+
+  const apply = db.transaction((orderedIds) => {
+    orderedIds.forEach((id, i) => reorderLessonStmt.run(i + 1, id, cid));
+  });
+  apply(ids);
+
+  return { lessons: listLessons(cid) };
+}

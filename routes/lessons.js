@@ -7,6 +7,7 @@ import {
   createLesson,
   updateLesson,
   deleteLesson,
+  reorderLessons,
 } from "../data/store.js";
 import { validateBody } from "../middleware/validate.js";
 import { parseEnumParam, parsePageParam } from "../lib/query.js";
@@ -64,6 +65,21 @@ router.get("/", (req, res) => {
 
   res.set("X-Total-Count", String(total));
   res.json(lessons);
+});
+
+// Reorder all of a course's lessons. Body: { order: [lessonId, ...] } — a
+// permutation of every lesson id in the course. Declared before "/:lessonId"
+// so "reorder" isn't captured as a lesson id.
+router.put("/reorder", (req, res) => {
+  const ids = req.body?.order;
+  if (!Array.isArray(ids) || ids.length === 0 || !ids.every(Number.isInteger)) {
+    return res.status(400).json({ error: "order must be a non-empty array of lesson ids" });
+  }
+  const result = reorderLessons(req.course.id, ids);
+  if (result.error) {
+    return res.status(400).json({ error: result.error });
+  }
+  res.json(result.lessons);
 });
 
 // Get a single lesson

@@ -468,3 +468,63 @@ test("DELETE course cascades to its lessons", async () => {
   assert.equal(lessons.status, 404);
   assert.equal((await lessons.json()).error, "Course not found");
 });
+
+// --- Reorder lessons ---
+
+async function makeCourseWithLessons(title, titles) {
+  const course = await (await req("POST", "/courses", { title })).json();
+  const lessons = [];
+  for (const t of titles) {
+    lessons.push(await (await req("POST", `/courses/${course.id}/lessons`, { title: t })).json());
+  }
+  return { course, lessons };
+}
+
+test("PUT lessons/reorder sets order to the given positions", async () => {
+  const { course, lessons } = await makeCourseWithLessons("Reorder me", ["A", "B", "C"]);
+  const [a, b, c] = lessons;
+
+  const res = await req("PUT", `/courses/${course.id}/lessons/reorder`, {
+    order: [c.id, a.id, b.id],
+  });
+  assert.equal(res.status, 200);
+  const reordered = await res.json();
+  assert.deepEqual(
+    reordered.map((l) => l.id),
+    [c.id, a.id, b.id]
+  );
+  assert.deepEqual(
+    reordered.map((l) => l.order),
+    [1, 2, 3]
+  );
+});
+
+test("reorder with a missing lesson id returns 400", async () => {
+  const { course, lessons } = await makeCourseWithLessons("Reorder missing", ["A", "B"]);
+  const res = await req("PUT", `/courses/${course.id}/lessons/reorder`, {
+    order: [lessons[0].id], // omits the second lesson
+  });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /every lesson exactly once/);
+});
+
+test("reorder with a foreign lesson id returns 400", async () => {
+  const { course, lessons } = await makeCourseWithLessons("Reorder foreign", ["A", "B"]);
+  const res = await req("PUT", `/courses/${course.id}/lessons/reorder`, {
+    order: [lessons[0].id, 999999], // right length, wrong id
+  });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /every lesson exactly once/);
+});
+
+test("reorder with a non-array body returns 400", async () => {
+  const res = await req("PUT", "/courses/1/lessons/reorder", { order: "nope" });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /non-empty array/);
+});
+
+test("reorder for an unknown course returns 404", async () => {
+  const res = await req("PUT", "/courses/999999/lessons/reorder", { order: [1] });
+  assert.equal(res.status, 404);
+  assert.equal((await res.json()).error, "Course not found");
+});

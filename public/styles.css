@@ -295,6 +295,39 @@ body {
   color: var(--text);
 }
 
+.reorder-hint {
+  color: var(--muted);
+  font-size: 14px;
+  margin-right: auto;
+}
+
+.reorder-list {
+  max-width: 46ch;
+}
+
+.reorder-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: grab;
+}
+
+.reorder-item .lesson__title {
+  font-weight: 600;
+}
+
+.reorder-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.drag-handle {
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  user-select: none;
+}
+
 .lessons .empty,
 .state {
   color: var(--muted);

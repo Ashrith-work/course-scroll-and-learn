@@ -51,6 +51,9 @@ Inside an expanded course, the lessons list has its own **search box and sort
 dropdown** (by order or title) and loads in pages of 10 with a **Load more**
 button, backed by `GET /courses/:id/lessons?q=&sort=&order=&limit=&offset=`.
 
+In the natural-order view, a **↕ Reorder** button enters a drag-and-drop mode
+that persists the new order via `PUT /courses/:id/lessons/reorder`.
+
 ## Project Structure
 
 ```
@@ -113,6 +116,7 @@ the OpenAPI 3 spec served at **`/openapi.json`**. Start the server and open
 | POST   | `/courses/:courseId/lessons`       | Create a lesson   |
 | PUT    | `/courses/:courseId/lessons/:id`   | Update a lesson   |
 | DELETE | `/courses/:courseId/lessons/:id`   | Delete a lesson   |
+| PUT    | `/courses/:courseId/lessons/reorder` | Reorder all lessons (body `{ order: [id, …] }`) |
 
 ## Scripts
 
