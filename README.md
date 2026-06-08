@@ -39,6 +39,9 @@ Full CRUD is available from the UI:
 
 Forms use a native `<dialog>` modal and talk to the same REST API.
 
+The header has a **search box** that filters the feed by course title or
+description (debounced, case-insensitive) via `GET /courses?q=`.
+
 ## Project Structure
 
 ```
@@ -83,7 +86,7 @@ Failures return `400 { "error": "..." }`. Malformed JSON also returns a clean
 
 | Method | Path                               | Description       |
 | ------ | ---------------------------------- | ----------------- |
-| GET    | `/courses`                         | List courses      |
+| GET    | `/courses`                         | List courses (optional `?q=` search by title/description) |
 | GET    | `/courses/:id`                     | Get a course      |
 | POST   | `/courses`                         | Create a course   |
 | PUT    | `/courses/:id`                     | Update a course   |

@@ -24,9 +24,10 @@ const courseUpdateSchema = {
 // Nested lessons: /courses/:courseId/lessons
 router.use("/:courseId/lessons", lessonsRouter);
 
-// List all courses
+// List courses, optionally filtered by a ?q= search term.
 router.get("/", (req, res) => {
-  res.json(listCourses());
+  const { q } = req.query;
+  res.json(listCourses(typeof q === "string" ? q : undefined));
 });
 
 // Get a single course by id

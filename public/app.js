@@ -1,6 +1,7 @@
 const feed = document.getElementById("feed");
 const hint = document.getElementById("hint");
 const fab = document.getElementById("fab");
+const searchInput = document.getElementById("search");
 
 const modal = document.getElementById("modal");
 const modalForm = document.getElementById("modal-form");
@@ -123,6 +124,8 @@ function openCourseForm(course) {
       const saved = isEdit
         ? await api("PUT", `/courses/${course.id}`, body)
         : await api("POST", "/courses", body);
+      // Clear an active search on create so the new course is visible.
+      if (!isEdit) searchInput.value = "";
       await loadFeed(saved.id);
     },
   });
@@ -259,9 +262,12 @@ function renderCourse(course, index, total) {
 // --- Feed ---
 
 async function loadFeed(targetCourseId) {
+  const query = searchInput.value.trim();
+  const url = query ? `/courses?q=${encodeURIComponent(query)}` : "/courses";
+
   let courses;
   try {
-    courses = await api("GET", "/courses");
+    courses = await api("GET", url);
   } catch (err) {
     renderState(`Could not load courses: ${err.message}`);
     hint.style.display = "none";
@@ -269,7 +275,9 @@ async function loadFeed(targetCourseId) {
   }
 
   if (courses.length === 0) {
-    renderState("No courses yet. Tap ＋ to create one.");
+    renderState(
+      query ? `No courses match “${query}”.` : "No courses yet. Tap ＋ to create one."
+    );
     hint.style.display = "none";
     return;
   }
@@ -286,5 +294,11 @@ async function loadFeed(targetCourseId) {
 }
 
 fab.addEventListener("click", () => openCourseForm(null));
+
+let searchTimer;
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadFeed(), 250);
+});
 
 loadFeed();
