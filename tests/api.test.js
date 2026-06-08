@@ -356,6 +356,41 @@ test("lesson list with an invalid order returns 400", async () => {
   assert.match((await res.json()).error, /order must be one of/);
 });
 
+test("lesson list ?limit caps results and sets X-Total-Count", async () => {
+  const res = await req("GET", "/courses/1/lessons?limit=1");
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("x-total-count"), "2");
+  const lessons = await res.json();
+  assert.equal(lessons.length, 1);
+  assert.equal(lessons[0].id, 1); // order asc default
+});
+
+test("lesson list ?offset skips earlier lessons", async () => {
+  const res = await req("GET", "/courses/1/lessons?limit=1&offset=1");
+  const lessons = await res.json();
+  assert.equal(lessons.length, 1);
+  assert.equal(lessons[0].id, 2);
+});
+
+test("lesson pagination composes with sort", async () => {
+  const res = await req("GET", "/courses/1/lessons?sort=order&order=desc&limit=1");
+  const lessons = await res.json();
+  assert.equal(lessons.length, 1);
+  assert.equal(lessons[0].id, 2); // highest order first
+});
+
+test("lesson list with a non-integer limit returns 400", async () => {
+  const res = await req("GET", "/courses/1/lessons?limit=abc");
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /limit must be an integer/);
+});
+
+test("lesson list with limit above the max returns 400", async () => {
+  const res = await req("GET", "/courses/1/lessons?limit=101");
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /between 1 and 100/);
+});
+
 test("GET lessons for unknown course returns 404", async () => {
   const res = await req("GET", "/courses/9999/lessons");
   assert.equal(res.status, 404);

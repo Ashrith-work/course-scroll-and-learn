@@ -166,58 +166,89 @@ const LESSON_SORTS = [
   ["title:asc", "Title A–Z"],
   ["title:desc", "Title Z–A"],
 ];
+const LESSON_PAGE_SIZE = 10;
+
+function renderLessonItem(lesson, courseId, renderList) {
+  const li = el("li");
+
+  const head = el("div", "lesson__head");
+  head.appendChild(el("div", "lesson__title", `${lesson.order}. ${lesson.title}`));
+
+  const actions = el("div", "lesson__actions");
+  const editBtn = el("button", "icon-btn", "✏️");
+  editBtn.title = "Edit lesson";
+  editBtn.addEventListener("click", () => openLessonForm(courseId, lesson, renderList));
+  const delBtn = el("button", "icon-btn", "🗑️");
+  delBtn.title = "Delete lesson";
+  delBtn.addEventListener("click", () =>
+    withAlert(async () => {
+      if (!confirm(`Delete lesson "${lesson.title}"?`)) return;
+      await api("DELETE", `/courses/${courseId}/lessons/${lesson.id}`);
+      await renderList();
+    })
+  );
+  actions.append(editBtn, delBtn);
+  head.appendChild(actions);
+  li.appendChild(head);
+
+  if (lesson.content) {
+    li.appendChild(el("div", "lesson__content", lesson.content));
+  }
+  return li;
+}
 
 // Fetch and render the lesson list into `list`, using `state` for the current
-// search/sort. `renderList` re-runs this so edits/deletes refresh in place.
+// search/sort. Pages of LESSON_PAGE_SIZE are appended via a "Load more" button.
+// `renderList` re-runs this from the top so edits/deletes refresh in place.
 async function fillLessonList(list, courseId, state, renderList) {
   list.innerHTML = "";
 
-  const params = new URLSearchParams({ sort: state.sort, order: state.order });
-  if (state.q) params.set("q", state.q);
-
-  let lessons;
-  try {
-    lessons = await api("GET", `/courses/${courseId}/lessons?${params}`);
-  } catch (err) {
-    list.appendChild(el("p", "empty", `Failed to load: ${err.message}`));
-    return;
-  }
-
-  if (lessons.length === 0) {
-    list.appendChild(el("p", "empty", state.q ? "No lessons match." : "No lessons yet."));
-    return;
-  }
-
   const ul = el("ul", "lessons");
-  for (const lesson of lessons) {
-    const li = el("li");
+  const moreBtn = el("button", "mini-btn", "Load more");
+  let loaded = 0;
+  let total = 0;
 
-    const head = el("div", "lesson__head");
-    head.appendChild(el("div", "lesson__title", `${lesson.order}. ${lesson.title}`));
+  async function loadPage() {
+    const params = new URLSearchParams({
+      sort: state.sort,
+      order: state.order,
+      limit: String(LESSON_PAGE_SIZE),
+      offset: String(loaded),
+    });
+    if (state.q) params.set("q", state.q);
 
-    const actions = el("div", "lesson__actions");
-    const editBtn = el("button", "icon-btn", "✏️");
-    editBtn.title = "Edit lesson";
-    editBtn.addEventListener("click", () => openLessonForm(courseId, lesson, renderList));
-    const delBtn = el("button", "icon-btn", "🗑️");
-    delBtn.title = "Delete lesson";
-    delBtn.addEventListener("click", () =>
-      withAlert(async () => {
-        if (!confirm(`Delete lesson "${lesson.title}"?`)) return;
-        await api("DELETE", `/courses/${courseId}/lessons/${lesson.id}`);
-        await renderList();
-      })
-    );
-    actions.append(editBtn, delBtn);
-    head.appendChild(actions);
-    li.appendChild(head);
-
-    if (lesson.content) {
-      li.appendChild(el("div", "lesson__content", lesson.content));
+    let lessons;
+    try {
+      const res = await fetch(`/courses/${courseId}/lessons?${params}`);
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      total = Number(res.headers.get("X-Total-Count"));
+      lessons = await res.json();
+      if (!Number.isFinite(total)) total = loaded + lessons.length;
+    } catch (err) {
+      if (loaded === 0) list.appendChild(el("p", "empty", `Failed to load: ${err.message}`));
+      return;
     }
-    ul.appendChild(li);
+
+    if (loaded === 0 && lessons.length === 0) {
+      list.appendChild(el("p", "empty", state.q ? "No lessons match." : "No lessons yet."));
+      return;
+    }
+
+    for (const lesson of lessons) {
+      ul.appendChild(renderLessonItem(lesson, courseId, renderList));
+    }
+    if (!ul.isConnected) list.appendChild(ul);
+    loaded += lessons.length;
+
+    if (loaded < total) {
+      if (!moreBtn.isConnected) list.appendChild(moreBtn);
+    } else {
+      moreBtn.remove();
+    }
   }
-  list.appendChild(ul);
+
+  moreBtn.addEventListener("click", () => withAlert(loadPage));
+  await loadPage();
 }
 
 async function refreshLessons(box, courseId) {

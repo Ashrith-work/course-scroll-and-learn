@@ -225,15 +225,26 @@ export const openapi = {
       get: {
         tags: ["Lessons"],
         summary: "List a course's lessons",
+        description:
+          "Supports search, sorting, and pagination. The total match count " +
+          "(ignoring pagination) is returned in the X-Total-Count header.",
         parameters: [
           lessonCourseIdParam,
           { name: "q", in: "query", schema: { type: "string" }, description: "Search title/content." },
           { name: "sort", in: "query", schema: { type: "string", enum: ["order", "title", "id"] } },
           { name: "order", in: "query", schema: { type: "string", enum: ["asc", "desc"] } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
+          { name: "offset", in: "query", schema: { type: "integer", minimum: 0 } },
         ],
         responses: {
           200: {
             description: "The lessons",
+            headers: {
+              "X-Total-Count": {
+                description: "Total lessons matching the query, ignoring pagination.",
+                schema: { type: "integer" },
+              },
+            },
             content: {
               "application/json": {
                 schema: { type: "array", items: { $ref: "#/components/schemas/Lesson" } },

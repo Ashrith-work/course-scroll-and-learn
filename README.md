@@ -48,7 +48,8 @@ next page (`?limit=&offset=`) as you near the bottom, using the
 first, title A–Z/Z–A) reorders the feed via `?sort=&order=`.
 
 Inside an expanded course, the lessons list has its own **search box and sort
-dropdown** (by order or title), backed by `GET /courses/:id/lessons?q=&sort=&order=`.
+dropdown** (by order or title) and loads in pages of 10 with a **Load more**
+button, backed by `GET /courses/:id/lessons?q=&sort=&order=&limit=&offset=`.
 
 ## Project Structure
 
@@ -107,7 +108,7 @@ the OpenAPI 3 spec served at **`/openapi.json`**. Start the server and open
 | POST   | `/courses`                         | Create a course   |
 | PUT    | `/courses/:id`                     | Update a course   |
 | DELETE | `/courses/:id`                     | Delete a course (cascades to lessons) |
-| GET    | `/courses/:courseId/lessons`       | List lessons. Optional `?q=` search (title/content) and `?sort=` (`order`\|`title`\|`id`) / `?order=` (`asc`\|`desc`) sorting. |
+| GET    | `/courses/:courseId/lessons`       | List lessons. Optional `?q=` search (title/content), `?sort=` (`order`\|`title`\|`id`) / `?order=` (`asc`\|`desc`) sorting, and `?limit=` (1–100) / `?offset=` (≥0) pagination. Total match count is in the `X-Total-Count` header. |
 | GET    | `/courses/:courseId/lessons/:id`   | Get a lesson      |
 | POST   | `/courses/:courseId/lessons`       | Create a lesson   |
 | PUT    | `/courses/:courseId/lessons/:id`   | Update a lesson   |
