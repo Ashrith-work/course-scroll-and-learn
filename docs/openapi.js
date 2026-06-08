@@ -107,6 +107,11 @@ const AuthResponse = {
 
 const secured = [{ bearerAuth: [] }];
 
+const tooManyRequests = {
+  description: "Rate limit exceeded",
+  content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+};
+
 const notFound = {
   description: "Not found",
   content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
@@ -158,6 +163,7 @@ export const openapi = {
       post: {
         tags: ["Auth"],
         summary: "Register a new account",
+        description: "Rate limited per IP.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: { $ref: "#/components/schemas/Credentials" } } },
@@ -172,6 +178,7 @@ export const openapi = {
             description: "Username already taken",
             content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
           },
+          429: tooManyRequests,
         },
       },
     },
@@ -179,6 +186,7 @@ export const openapi = {
       post: {
         tags: ["Auth"],
         summary: "Log in",
+        description: "Rate limited per IP.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: { $ref: "#/components/schemas/Credentials" } } },
@@ -193,6 +201,7 @@ export const openapi = {
             description: "Invalid credentials",
             content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
           },
+          429: tooManyRequests,
         },
       },
     },

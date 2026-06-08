@@ -99,7 +99,8 @@ that persists the new order via `PUT /courses/:id/lessons/reorder`.
 │   └── lessons.js      # /courses/:courseId/lessons CRUD (nested)
 ├── middleware/
 │   ├── validate.js     # schema-driven request-body validation
-│   └── auth.js         # Bearer-token auth guard
+│   ├── auth.js         # Bearer-token auth guard
+│   └── rateLimit.js    # in-memory per-IP rate limiter
 ├── lib/
 │   └── query.js        # query-string param validators (pagination, enums)
 ├── tests/
@@ -146,6 +147,12 @@ hashed with scrypt; tokens are opaque random strings stored server-side.
 
 Write endpoints (`POST`/`PUT`/`DELETE` on courses & lessons, and reorder)
 return `401` without a valid token.
+
+`/auth/login` and `/auth/register` are **rate limited per IP** (in-memory fixed
+window) to slow brute-force and signup abuse. Exceeding the limit returns `429`
+with a `Retry-After` header; responses include `RateLimit-*` headers. Tune with
+`AUTH_RATELIMIT_MAX` (default 10) and `AUTH_RATELIMIT_WINDOW_MS` (default 15 min).
+Behind a reverse proxy, configure Express `trust proxy` so the client IP is used.
 
 | Method | Path                               | Description       |
 | ------ | ---------------------------------- | ----------------- |
