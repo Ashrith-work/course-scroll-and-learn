@@ -52,6 +52,8 @@ Forms use a native `<dialog>` modal and talk to the same REST API.
 ├── routes/
 │   ├── courses.js      # /courses CRUD
 │   └── lessons.js      # /courses/:courseId/lessons CRUD (nested)
+├── tests/
+│   └── api.test.js     # API tests (node --test)
 ├── package.json        # Project metadata and scripts
 └── README.md
 ```
@@ -84,7 +86,18 @@ Override the location with the `DB_PATH` environment variable.
 | Command         | Description                  |
 | --------------- | ---------------------------- |
 | `npm start`     | Run the application          |
-| `npm test`      | Run tests (not yet set up)   |
+| `npm test`      | Run the API test suite       |
+
+## Testing
+
+API tests use Node's built-in test runner (`node --test`) — no extra
+dependencies. They spin up the app on an ephemeral port against a throwaway
+SQLite database (`DB_PATH` points at a temp file), so the real `courses.db` is
+never touched. Run them with:
+
+```bash
+npm test
+```
 
 ## License
 
