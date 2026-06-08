@@ -66,6 +66,32 @@ body {
   background: rgba(0, 0, 0, 0.55);
 }
 
+.sort {
+  pointer-events: auto;
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 9px 14px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.sort:focus {
+  outline: none;
+  border-color: #818cf8;
+}
+
+/* Dropdown options render in the browser's native menu, which needs a dark
+   background to stay readable. */
+.sort option {
+  background: #1b1d33;
+  color: var(--text);
+}
+
 /* Full-screen vertical snap feed */
 .feed {
   height: 100vh;

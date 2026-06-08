@@ -24,6 +24,19 @@ function parsePageParam(raw, name, { min, max }) {
   return { value: n };
 }
 
+const SORT_FIELDS = ["id", "title"];
+const SORT_ORDERS = ["asc", "desc"];
+
+// Validate an optional query param against an allowed set.
+// Returns { value } (undefined when absent) or { error }.
+function parseEnumParam(raw, name, allowed) {
+  if (raw === undefined) return { value: undefined };
+  if (!allowed.includes(raw)) {
+    return { error: `${name} must be one of: ${allowed.join(", ")}` };
+  }
+  return { value: raw };
+}
+
 const courseCreateSchema = {
   title: { type: "string", required: true, maxLength: 200 },
   description: { type: "string", default: "", maxLength: 2000 },
@@ -37,20 +50,28 @@ const courseUpdateSchema = {
 // Nested lessons: /courses/:courseId/lessons
 router.use("/:courseId/lessons", lessonsRouter);
 
-// List courses, optionally filtered by a ?q= search term and paginated with
-// ?limit= (1-100) and ?offset= (>=0). The total match count (ignoring
-// pagination) is returned in the X-Total-Count header.
+// List courses. Optional ?q= search; ?limit= (1-100) / ?offset= (>=0)
+// pagination; ?sort= (id|title) and ?order= (asc|desc) sorting. The total match
+// count (ignoring pagination) is returned in the X-Total-Count header.
 router.get("/", (req, res) => {
   const { q } = req.query;
   const search = typeof q === "string" ? q : undefined;
 
   const limit = parsePageParam(req.query.limit, "limit", { min: 1, max: 100 });
   const offset = parsePageParam(req.query.offset, "offset", { min: 0 });
-  if (limit.error) return res.status(400).json({ error: limit.error });
-  if (offset.error) return res.status(400).json({ error: offset.error });
+  const sort = parseEnumParam(req.query.sort, "sort", SORT_FIELDS);
+  const order = parseEnumParam(req.query.order, "order", SORT_ORDERS);
+  for (const p of [limit, offset, sort, order]) {
+    if (p.error) return res.status(400).json({ error: p.error });
+  }
 
   const total = countCourses(search);
-  const courses = listCourses(search, { limit: limit.value, offset: offset.value });
+  const courses = listCourses(search, {
+    limit: limit.value,
+    offset: offset.value,
+    sort: sort.value,
+    order: order.value,
+  });
 
   res.set("X-Total-Count", String(total));
   res.json(courses);
