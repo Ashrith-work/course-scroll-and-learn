@@ -2,6 +2,7 @@ import express from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import coursesRouter from "./routes/courses.js";
+import authRouter from "./routes/auth.js";
 import { openapi } from "./docs/openapi.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -14,6 +15,7 @@ app.use(express.json());
 // Serve the static frontend (index.html, app.js, styles.css).
 app.use(express.static(join(__dirname, "public")));
 
+app.use("/auth", authRouter);
 app.use("/courses", coursesRouter);
 
 app.get("/health", (req, res) => {

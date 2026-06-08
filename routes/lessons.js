@@ -10,6 +10,7 @@ import {
   reorderLessons,
 } from "../data/store.js";
 import { validateBody } from "../middleware/validate.js";
+import { requireAuth } from "../middleware/auth.js";
 import { parseEnumParam, parsePageParam } from "../lib/query.js";
 
 // mergeParams lets us read :courseId from the parent (courses) router.
@@ -70,7 +71,7 @@ router.get("/", (req, res) => {
 // Reorder all of a course's lessons. Body: { order: [lessonId, ...] } — a
 // permutation of every lesson id in the course. Declared before "/:lessonId"
 // so "reorder" isn't captured as a lesson id.
-router.put("/reorder", (req, res) => {
+router.put("/reorder", requireAuth, (req, res) => {
   const ids = req.body?.order;
   if (!Array.isArray(ids) || ids.length === 0 || !ids.every(Number.isInteger)) {
     return res.status(400).json({ error: "order must be a non-empty array of lesson ids" });
@@ -92,13 +93,13 @@ router.get("/:lessonId", (req, res) => {
 });
 
 // Create a lesson under a course
-router.post("/", validateBody(lessonCreateSchema), (req, res) => {
+router.post("/", requireAuth, validateBody(lessonCreateSchema), (req, res) => {
   const lesson = createLesson(req.course.id, req.body);
   res.status(201).json(lesson);
 });
 
 // Update a lesson
-router.put("/:lessonId", validateBody(lessonUpdateSchema), (req, res) => {
+router.put("/:lessonId", requireAuth, validateBody(lessonUpdateSchema), (req, res) => {
   const lesson = updateLesson(req.course.id, req.params.lessonId, req.body);
   if (!lesson) {
     return res.status(404).json({ error: "Lesson not found" });
@@ -107,7 +108,7 @@ router.put("/:lessonId", validateBody(lessonUpdateSchema), (req, res) => {
 });
 
 // Delete a lesson
-router.delete("/:lessonId", (req, res) => {
+router.delete("/:lessonId", requireAuth, (req, res) => {
   const removed = deleteLesson(req.course.id, req.params.lessonId);
   if (!removed) {
     return res.status(404).json({ error: "Lesson not found" });

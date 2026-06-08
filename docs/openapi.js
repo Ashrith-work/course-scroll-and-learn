@@ -78,6 +78,35 @@ const ReorderLessons = {
   required: ["order"],
 };
 
+const User = {
+  type: "object",
+  properties: {
+    id: { type: "integer", example: 1 },
+    username: { type: "string", example: "alice" },
+  },
+  required: ["id", "username"],
+};
+
+const Credentials = {
+  type: "object",
+  properties: {
+    username: { type: "string", minLength: 3, maxLength: 50 },
+    password: { type: "string", minLength: 8, maxLength: 200, format: "password" },
+  },
+  required: ["username", "password"],
+};
+
+const AuthResponse = {
+  type: "object",
+  properties: {
+    token: { type: "string", description: "Bearer token for the Authorization header." },
+    user: { $ref: "#/components/schemas/User" },
+  },
+  required: ["token", "user"],
+};
+
+const secured = [{ bearerAuth: [] }];
+
 const notFound = {
   description: "Not found",
   content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
@@ -120,10 +149,92 @@ export const openapi = {
   servers: [{ url: "/", description: "This server" }],
   tags: [
     { name: "Health" },
+    { name: "Auth" },
     { name: "Courses" },
     { name: "Lessons" },
   ],
   paths: {
+    "/auth/register": {
+      post: {
+        tags: ["Auth"],
+        summary: "Register a new account",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/Credentials" } } },
+        },
+        responses: {
+          201: {
+            description: "Account created; returns a session token",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AuthResponse" } } },
+          },
+          400: badRequest,
+          409: {
+            description: "Username already taken",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+        },
+      },
+    },
+    "/auth/login": {
+      post: {
+        tags: ["Auth"],
+        summary: "Log in",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/Credentials" } } },
+        },
+        responses: {
+          200: {
+            description: "Returns a session token",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AuthResponse" } } },
+          },
+          400: badRequest,
+          401: {
+            description: "Invalid credentials",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+        },
+      },
+    },
+    "/auth/logout": {
+      post: {
+        tags: ["Auth"],
+        summary: "Invalidate the current session token",
+        security: secured,
+        responses: {
+          200: {
+            description: "Logged out",
+            content: {
+              "application/json": {
+                schema: { type: "object", properties: { ok: { type: "boolean" } } },
+              },
+            },
+          },
+          401: { description: "Not authenticated" },
+        },
+      },
+    },
+    "/auth/me": {
+      get: {
+        tags: ["Auth"],
+        summary: "Get the authenticated user",
+        security: secured,
+        responses: {
+          200: {
+            description: "The current user",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { user: { $ref: "#/components/schemas/User" } },
+                },
+              },
+            },
+          },
+          401: { description: "Not authenticated" },
+        },
+      },
+    },
     "/health": {
       get: {
         tags: ["Health"],
@@ -178,6 +289,7 @@ export const openapi = {
       post: {
         tags: ["Courses"],
         summary: "Create a course",
+        security: secured,
         requestBody: {
           required: true,
           content: { "application/json": { schema: { $ref: "#/components/schemas/NewCourse" } } },
@@ -207,6 +319,7 @@ export const openapi = {
       put: {
         tags: ["Courses"],
         summary: "Update a course",
+        security: secured,
         parameters: [courseIdParam],
         requestBody: {
           required: true,
@@ -224,6 +337,7 @@ export const openapi = {
       delete: {
         tags: ["Courses"],
         summary: "Delete a course (cascades to its lessons)",
+        security: secured,
         parameters: [courseIdParam],
         responses: {
           200: {
@@ -271,6 +385,7 @@ export const openapi = {
       post: {
         tags: ["Lessons"],
         summary: "Create a lesson under a course",
+        security: secured,
         parameters: [lessonCourseIdParam],
         requestBody: {
           required: true,
@@ -290,6 +405,7 @@ export const openapi = {
       put: {
         tags: ["Lessons"],
         summary: "Reorder a course's lessons",
+        security: secured,
         description:
           "Body must list every lesson id in the course exactly once; each " +
           "lesson's order is set to its 1-based position.",
@@ -328,6 +444,7 @@ export const openapi = {
       put: {
         tags: ["Lessons"],
         summary: "Update a lesson",
+        security: secured,
         parameters: [lessonCourseIdParam, lessonIdParam],
         requestBody: {
           required: true,
@@ -345,6 +462,7 @@ export const openapi = {
       delete: {
         tags: ["Lessons"],
         summary: "Delete a lesson",
+        security: secured,
         parameters: [lessonCourseIdParam, lessonIdParam],
         responses: {
           200: {
@@ -357,6 +475,21 @@ export const openapi = {
     },
   },
   components: {
-    schemas: { Error, Course, NewCourse, CourseUpdate, Lesson, NewLesson, LessonUpdate, ReorderLessons },
+    securitySchemes: {
+      bearerAuth: { type: "http", scheme: "bearer", description: "Session token from /auth/login or /auth/register." },
+    },
+    schemas: {
+      Error,
+      Course,
+      NewCourse,
+      CourseUpdate,
+      Lesson,
+      NewLesson,
+      LessonUpdate,
+      ReorderLessons,
+      User,
+      Credentials,
+      AuthResponse,
+    },
   },
 };

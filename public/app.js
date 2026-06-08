@@ -3,6 +3,7 @@ const hint = document.getElementById("hint");
 const fab = document.getElementById("fab");
 const searchInput = document.getElementById("search");
 const sortSelect = document.getElementById("sort");
+const authArea = document.getElementById("authArea");
 
 const modal = document.getElementById("modal");
 const modalForm = document.getElementById("modal-form");
@@ -10,6 +11,24 @@ const modalTitle = document.getElementById("modal-title");
 const modalFields = document.getElementById("modal-fields");
 const modalError = document.getElementById("modal-error");
 const modalCancel = document.getElementById("modal-cancel");
+
+// --- Auth state ---
+
+function loadAuth() {
+  try {
+    return JSON.parse(localStorage.getItem("auth")) || null;
+  } catch {
+    return null;
+  }
+}
+
+let auth = loadAuth();
+
+function saveAuth(value) {
+  auth = value;
+  if (value) localStorage.setItem("auth", JSON.stringify(value));
+  else localStorage.removeItem("auth");
+}
 
 // --- API helper ---
 
@@ -19,6 +38,7 @@ async function api(method, url, body) {
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
   }
+  if (auth?.token) opts.headers["Authorization"] = `Bearer ${auth.token}`;
   const res = await fetch(url, opts);
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`;
@@ -174,7 +194,7 @@ function renderLessonItem(lesson, courseId, renderList) {
   const head = el("div", "lesson__head");
   head.appendChild(el("div", "lesson__title", `${lesson.order}. ${lesson.title}`));
 
-  const actions = el("div", "lesson__actions");
+  const actions = el("div", "lesson__actions needs-auth");
   const editBtn = el("button", "icon-btn", "✏️");
   editBtn.title = "Edit lesson";
   editBtn.addEventListener("click", () => openLessonForm(courseId, lesson, renderList));
@@ -259,7 +279,7 @@ async function refreshLessons(box, courseId) {
 
   const controls = el("div", "lesson-controls");
 
-  const addBtn = el("button", "mini-btn", "+ Add lesson");
+  const addBtn = el("button", "mini-btn needs-auth", "+ Add lesson");
 
   const search = el("input", "lesson-search");
   search.type = "search";
@@ -283,7 +303,7 @@ async function refreshLessons(box, courseId) {
 
   // Reordering only makes sense in the natural order view (no search, order ↑).
   if (state.sort === "order" && state.order === "asc" && !state.q) {
-    const reorderBtn = el("button", "mini-btn", "↕ Reorder");
+    const reorderBtn = el("button", "mini-btn needs-auth", "↕ Reorder");
     reorderBtn.addEventListener("click", () => enterReorderMode(box, courseId));
     controls.appendChild(reorderBtn);
   }
@@ -395,8 +415,8 @@ function renderCourse(course, index, total) {
 
   const actions = el("div", "card__actions");
   const viewBtn = el("button", "card__btn", "View lessons");
-  const editBtn = el("button", "card__btn card__btn--ghost", "Edit");
-  const delBtn = el("button", "card__btn card__btn--ghost", "Delete");
+  const editBtn = el("button", "card__btn card__btn--ghost needs-auth", "Edit");
+  const delBtn = el("button", "card__btn card__btn--ghost needs-auth", "Delete");
   actions.append(viewBtn, editBtn, delBtn);
   card.appendChild(actions);
 
@@ -514,4 +534,68 @@ searchInput.addEventListener("input", () => {
 
 sortSelect.addEventListener("change", () => loadFeed(true));
 
-loadFeed(true);
+// --- Auth UI ---
+
+function openAuthForm(mode) {
+  const isLogin = mode === "login";
+  openForm({
+    title: isLogin ? "Log in" : "Sign up",
+    fields: [
+      { name: "username", label: "Username", required: true },
+      { name: "password", label: "Password", type: "password", required: true },
+    ],
+    onSubmit: async (data) => {
+      const path = isLogin ? "/auth/login" : "/auth/register";
+      const result = await api("POST", path, {
+        username: data.username.trim(),
+        password: data.password,
+      });
+      saveAuth({ token: result.token, user: result.user });
+      renderAuth();
+      await loadFeed(true);
+    },
+  });
+}
+
+async function logout() {
+  await withAlert(async () => {
+    if (auth?.token) await api("POST", "/auth/logout");
+  });
+  saveAuth(null);
+  renderAuth();
+  await loadFeed(true);
+}
+
+function renderAuth() {
+  authArea.innerHTML = "";
+  if (auth?.user) {
+    authArea.appendChild(el("span", "auth-user", `👤 ${auth.user.username}`));
+    const out = el("button", "auth-btn", "Log out");
+    out.addEventListener("click", logout);
+    authArea.appendChild(out);
+  } else {
+    const login = el("button", "auth-btn", "Log in");
+    login.addEventListener("click", () => openAuthForm("login"));
+    const signup = el("button", "auth-btn auth-btn--primary", "Sign up");
+    signup.addEventListener("click", () => openAuthForm("register"));
+    authArea.append(login, signup);
+  }
+  // Toggles visibility of write controls (see .needs-auth in CSS).
+  document.body.classList.toggle("authed", Boolean(auth?.user));
+}
+
+// Validate a stored token on load; clear it if the server rejects it.
+async function initAuth() {
+  if (auth?.token) {
+    try {
+      const { user } = await api("GET", "/auth/me");
+      saveAuth({ token: auth.token, user });
+    } catch {
+      saveAuth(null);
+    }
+  }
+  renderAuth();
+}
+
+await initAuth();
+await loadFeed(true);
