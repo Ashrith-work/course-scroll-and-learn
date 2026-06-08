@@ -1,0 +1,36 @@
+# Dependencies (reinstalled in the image)
+node_modules
+
+# Git & CI
+.git
+.gitignore
+.github
+
+# SQLite database files (created at runtime on the volume)
+*.db
+*.db-shm
+*.db-wal
+
+# Tests and docs not needed at runtime
+tests
+
+# Local env & editor files
+.env
+.env.*
+.vscode
+.idea
+
+# Logs & caches
+logs
+*.log
+coverage
+.npm
+.eslintcache
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+.dockerignore

@@ -25,6 +25,26 @@ npm start
 This runs the `index.js` entry point. Then open
 [http://localhost:3000](http://localhost:3000) for the scroll feed.
 
+## Docker
+
+Build and run the container, persisting the database on a named volume:
+
+```bash
+docker build -t course-scroll-and-learn .
+docker run -p 3000:3000 -v course-data:/data course-scroll-and-learn
+```
+
+Or with Compose:
+
+```bash
+docker compose up --build
+```
+
+The image is a multi-stage build on `node:22-slim`, runs as the non-root
+`node` user, stores the SQLite database at `/data/courses.db` (mount a volume
+to persist it), and ships a `HEALTHCHECK` that probes `/health`. Configure via
+the `PORT` and `DB_PATH` environment variables.
+
 ## Frontend
 
 A dependency-free static frontend (served from `public/`) presents courses as a
@@ -61,6 +81,8 @@ that persists the new order via `PUT /courses/:id/lessons/reorder`.
 
 ```
 .
+├── Dockerfile          # Multi-stage production image
+├── docker-compose.yml  # Local run with a persistent volume
 ├── index.js            # Application entry point (Express server)
 ├── public/             # Static frontend (vertical scroll feed)
 │   ├── index.html

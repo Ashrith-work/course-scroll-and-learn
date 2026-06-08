@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      # Persist the SQLite database across container restarts.
+      - course-data:/data
+    restart: unless-stopped
+
+volumes:
+  course-data:
