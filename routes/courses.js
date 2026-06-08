@@ -1,15 +1,11 @@
 import { Router } from "express";
+import { courses, nextCourseId, findCourse } from "../data/store.js";
+import lessonsRouter from "./lessons.js";
 
 const router = Router();
 
-// In-memory course store (replace with a database later)
-let courses = [
-  { id: 1, title: "Intro to JavaScript", description: "Learn the basics of JS", lessons: 12 },
-  { id: 2, title: "Node.js Fundamentals", description: "Server-side JavaScript", lessons: 8 },
-  { id: 3, title: "Building REST APIs", description: "Design and build APIs with Express", lessons: 10 },
-];
-
-let nextId = courses.length + 1;
+// Nested lessons: /courses/:courseId/lessons
+router.use("/:courseId/lessons", lessonsRouter);
 
 // List all courses
 router.get("/", (req, res) => {
@@ -18,8 +14,7 @@ router.get("/", (req, res) => {
 
 // Get a single course by id
 router.get("/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const course = courses.find((c) => c.id === id);
+  const course = findCourse(req.params.id);
   if (!course) {
     return res.status(404).json({ error: "Course not found" });
   }
@@ -28,15 +23,14 @@ router.get("/:id", (req, res) => {
 
 // Create a course
 router.post("/", (req, res) => {
-  const { title, description, lessons } = req.body ?? {};
+  const { title, description } = req.body ?? {};
   if (!title) {
     return res.status(400).json({ error: "title is required" });
   }
   const course = {
-    id: nextId++,
+    id: nextCourseId(),
     title,
     description: description ?? "",
-    lessons: lessons ?? 0,
   };
   courses.push(course);
   res.status(201).json(course);
@@ -44,15 +38,13 @@ router.post("/", (req, res) => {
 
 // Update a course
 router.put("/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const course = courses.find((c) => c.id === id);
+  const course = findCourse(req.params.id);
   if (!course) {
     return res.status(404).json({ error: "Course not found" });
   }
-  const { title, description, lessons } = req.body ?? {};
+  const { title, description } = req.body ?? {};
   if (title !== undefined) course.title = title;
   if (description !== undefined) course.description = description;
-  if (lessons !== undefined) course.lessons = lessons;
   res.json(course);
 });
 
