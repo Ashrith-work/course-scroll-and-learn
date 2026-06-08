@@ -1,0 +1,33 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Deploy: Render Dashboard → New + → Blueprint → connect this repo. Render reads
+# this file and provisions the service automatically.
+#
+# This default is a FREE, ephemeral demo: the SQLite database lives inside the
+# container's writable layer (/data, owned by the non-root `node` user) and is
+# re-seeded on each deploy/restart. Perfect for a public demo link.
+#
+# To make data PERSISTENT instead:
+#   1. Change `plan` to `starter` (or higher) — disks need a paid instance.
+#   2. Uncomment the `disk:` block below.
+#   Note: Render disks are mounted root-owned, so for the non-root container to
+#   write to /data you may also need to run it as root (add `USER root` near the
+#   end of the Dockerfile) or chown the mount on startup.
+services:
+  - type: web
+    name: course-scroll-and-learn
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: /data/courses.db
+      - key: TRUST_PROXY
+        value: "1"
+    # disk:
+    #   name: course-data
+    #   mountPath: /data
+    #   sizeGB: 1

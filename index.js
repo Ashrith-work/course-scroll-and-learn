@@ -10,6 +10,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Behind a reverse proxy (e.g. Render), trust X-Forwarded-* so req.ip is the
+// real client IP for rate limiting. Off by default to avoid header spoofing.
+// Set TRUST_PROXY to a hop count (e.g. "1") or an Express trust-proxy value.
+if (process.env.TRUST_PROXY) {
+  const tp = process.env.TRUST_PROXY;
+  app.set("trust proxy", /^\d+$/.test(tp) ? Number(tp) : tp);
+}
+
 app.use(express.json());
 
 // Serve the static frontend (index.html, app.js, styles.css).

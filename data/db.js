@@ -1,9 +1,13 @@
 import Database from "better-sqlite3";
+import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = process.env.DB_PATH || join(__dirname, "..", "courses.db");
+
+// Ensure the database directory exists (e.g. a mounted /data volume on first boot).
+mkdirSync(dirname(dbPath), { recursive: true });
 
 const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");
