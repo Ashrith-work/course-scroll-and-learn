@@ -66,6 +66,43 @@ test("GET /courses returns the seeded courses", async () => {
   assert.equal(courses[0].title, "Intro to JavaScript");
 });
 
+test("GET /courses?q= filters by title", async () => {
+  const res = await req("GET", "/courses?q=Node");
+  assert.equal(res.status, 200);
+  const courses = await res.json();
+  assert.equal(courses.length, 1);
+  assert.equal(courses[0].title, "Node.js Fundamentals");
+});
+
+test("course search is case-insensitive and matches title or description", async () => {
+  // "javascript" appears in course 1's title and course 2's description.
+  const courses = await (await req("GET", "/courses?q=javascript")).json();
+  const titles = courses.map((c) => c.title).sort();
+  assert.deepEqual(titles, ["Intro to JavaScript", "Node.js Fundamentals"]);
+});
+
+test("course search matches the description", async () => {
+  const courses = await (await req("GET", "/courses?q=Express")).json();
+  assert.equal(courses.length, 1);
+  assert.equal(courses[0].title, "Building REST APIs");
+});
+
+test("course search with no matches returns an empty array", async () => {
+  const courses = await (await req("GET", "/courses?q=nonexistentterm")).json();
+  assert.deepEqual(courses, []);
+});
+
+test("course search treats LIKE wildcards literally", async () => {
+  // '%' must not act as a wildcard that matches everything.
+  const courses = await (await req("GET", "/courses?q=%25")).json();
+  assert.deepEqual(courses, []);
+});
+
+test("blank search query returns all courses", async () => {
+  const courses = await (await req("GET", "/courses?q=%20%20")).json();
+  assert.equal(courses.length, 3);
+});
+
 test("GET /courses/:id returns one course", async () => {
   const res = await req("GET", "/courses/1");
   assert.equal(res.status, 200);

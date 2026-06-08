@@ -5,13 +5,26 @@ import db from "./db.js";
 // --- Courses ---
 
 const selectCourses = db.prepare("SELECT id, title, description FROM courses ORDER BY id");
+const searchCourses = db.prepare(
+  `SELECT id, title, description FROM courses
+   WHERE title LIKE @like ESCAPE '\\' OR description LIKE @like ESCAPE '\\'
+   ORDER BY id`
+);
 const selectCourse = db.prepare("SELECT id, title, description FROM courses WHERE id = ?");
 const insertCourse = db.prepare("INSERT INTO courses (title, description) VALUES (?, ?)");
 const updateCourseStmt = db.prepare("UPDATE courses SET title = ?, description = ? WHERE id = ?");
 const deleteCourseStmt = db.prepare("DELETE FROM courses WHERE id = ?");
 
-export function listCourses() {
-  return selectCourses.all();
+// Search courses by title/description. Falls back to listing all when the
+// query is empty. LIKE wildcards in the query are escaped so they match
+// literally.
+export function listCourses(search) {
+  const term = typeof search === "string" ? search.trim() : "";
+  if (term === "") {
+    return selectCourses.all();
+  }
+  const escaped = term.replace(/[\\%_]/g, "\\$&");
+  return searchCourses.all({ like: `%${escaped}%` });
 }
 
 export function findCourse(id) {
