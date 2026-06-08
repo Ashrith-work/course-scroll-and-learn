@@ -17,6 +17,20 @@
 
     <div id="hint" class="hint">Scroll to explore ↓</div>
 
+    <button id="fab" class="fab" title="New course" aria-label="New course">＋</button>
+
+    <dialog id="modal" class="modal">
+      <form id="modal-form">
+        <h3 id="modal-title">New course</h3>
+        <div id="modal-fields"></div>
+        <p id="modal-error" class="modal-error" hidden></p>
+        <menu class="modal-actions">
+          <button type="button" id="modal-cancel" class="btn-ghost">Cancel</button>
+          <button type="submit" class="btn-primary">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
     <script src="/app.js" type="module"></script>
   </body>
 </html>

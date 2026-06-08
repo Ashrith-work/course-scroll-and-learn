@@ -29,6 +29,14 @@ A dependency-free static frontend (served from `public/`) presents courses as a
 full-screen, vertically snapping scroll feed. Each card shows a course and a
 **View lessons** button that lazy-loads its lessons from the API.
 
+Full CRUD is available from the UI:
+
+- **＋ button** (bottom-right) — create a course
+- **Edit / Delete** on each course card (delete cascades to its lessons)
+- **+ Add lesson**, plus per-lesson edit/delete, inside the lessons list
+
+Forms use a native `<dialog>` modal and talk to the same REST API.
+
 ## Project Structure
 
 ```
