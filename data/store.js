@@ -4,16 +4,6 @@ import db from "./db.js";
 
 // --- Courses ---
 
-// LIMIT -1 means "no limit" in SQLite, so the same statement serves both the
-// paged and unpaged cases.
-const selectCourses = db.prepare(
-  "SELECT id, title, description FROM courses ORDER BY id LIMIT @limit OFFSET @offset"
-);
-const searchCourses = db.prepare(
-  `SELECT id, title, description FROM courses
-   WHERE title LIKE @like ESCAPE '\\' OR description LIKE @like ESCAPE '\\'
-   ORDER BY id LIMIT @limit OFFSET @offset`
-);
 const countCoursesStmt = db.prepare("SELECT COUNT(*) AS n FROM courses");
 const countSearchStmt = db.prepare(
   `SELECT COUNT(*) AS n FROM courses
@@ -24,19 +14,49 @@ const insertCourse = db.prepare("INSERT INTO courses (title, description) VALUES
 const updateCourseStmt = db.prepare("UPDATE courses SET title = ?, description = ? WHERE id = ?");
 const deleteCourseStmt = db.prepare("DELETE FROM courses WHERE id = ?");
 
+// Whitelists for ORDER BY. ORDER BY can't be parameterized, so sort/direction
+// are mapped through these tables — only known-safe SQL fragments are ever
+// interpolated. Defaults reproduce the previous behavior (id ASC).
+const SORT_COLUMNS = { id: "id", title: "title COLLATE NOCASE" };
+const SORT_DIRECTIONS = { asc: "ASC", desc: "DESC" };
+
+// LIMIT -1 means "no limit" in SQLite, so one statement serves paged and
+// unpaged cases. Prepared statements are memoized per (search, sort, dir).
+const stmtCache = new Map();
+function coursesStmt(hasSearch, sortExpr, dir) {
+  const key = `${hasSearch}|${sortExpr}|${dir}`;
+  let stmt = stmtCache.get(key);
+  if (!stmt) {
+    const where = hasSearch
+      ? `WHERE title LIKE @like ESCAPE '\\' OR description LIKE @like ESCAPE '\\'`
+      : "";
+    stmt = db.prepare(
+      `SELECT id, title, description FROM courses ${where}
+       ORDER BY ${sortExpr} ${dir}, id ${dir} LIMIT @limit OFFSET @offset`
+    );
+    stmtCache.set(key, stmt);
+  }
+  return stmt;
+}
+
 function searchLike(term) {
   return `%${term.replace(/[\\%_]/g, "\\$&")}%`;
 }
 
 // Search courses by title/description (empty query = all), with optional
-// pagination. LIKE wildcards in the query are escaped so they match literally.
-export function listCourses(search, { limit, offset } = {}) {
+// pagination and sorting. LIKE wildcards in the query are escaped so they match
+// literally; unknown sort/order values fall back to the defaults.
+export function listCourses(search, { limit, offset, sort, order } = {}) {
   const term = typeof search === "string" ? search.trim() : "";
+  const sortExpr = SORT_COLUMNS[sort] ?? SORT_COLUMNS.id;
+  const dir = SORT_DIRECTIONS[order] ?? SORT_DIRECTIONS.asc;
   const params = { limit: limit ?? -1, offset: offset ?? 0 };
+
+  const stmt = coursesStmt(term !== "", sortExpr, dir);
   if (term === "") {
-    return selectCourses.all(params);
+    return stmt.all(params);
   }
-  return searchCourses.all({ ...params, like: searchLike(term) });
+  return stmt.all({ ...params, like: searchLike(term) });
 }
 
 // Total number of courses matching the (optional) search term.

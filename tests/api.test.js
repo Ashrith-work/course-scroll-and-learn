@@ -152,6 +152,51 @@ test("GET /courses with limit above the max returns 400", async () => {
   assert.match((await res.json()).error, /between 1 and 100/);
 });
 
+// Seeded titles: 1 "Intro to JavaScript", 2 "Node.js Fundamentals",
+// 3 "Building REST APIs". Alphabetical => [3, 1, 2].
+test("GET /courses?sort=title orders alphabetically", async () => {
+  const courses = await (await req("GET", "/courses?sort=title")).json();
+  assert.deepEqual(
+    courses.map((c) => c.id),
+    [3, 1, 2]
+  );
+});
+
+test("GET /courses?sort=title&order=desc reverses the order", async () => {
+  const courses = await (await req("GET", "/courses?sort=title&order=desc")).json();
+  assert.deepEqual(
+    courses.map((c) => c.id),
+    [2, 1, 3]
+  );
+});
+
+test("GET /courses?sort=id&order=desc lists newest first", async () => {
+  const courses = await (await req("GET", "/courses?sort=id&order=desc")).json();
+  assert.deepEqual(
+    courses.map((c) => c.id),
+    [3, 2, 1]
+  );
+});
+
+test("sorting composes with pagination", async () => {
+  const res = await req("GET", "/courses?sort=title&order=asc&limit=1");
+  const courses = await res.json();
+  assert.equal(courses.length, 1);
+  assert.equal(courses[0].id, 3); // "Building REST APIs" sorts first
+});
+
+test("GET /courses with an invalid sort field returns 400", async () => {
+  const res = await req("GET", "/courses?sort=bogus");
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /sort must be one of/);
+});
+
+test("GET /courses with an invalid order returns 400", async () => {
+  const res = await req("GET", "/courses?order=sideways");
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /order must be one of/);
+});
+
 test("GET /courses/:id returns one course", async () => {
   const res = await req("GET", "/courses/1");
   assert.equal(res.status, 200);

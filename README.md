@@ -44,7 +44,8 @@ description (debounced, case-insensitive) via `GET /courses?q=`.
 
 The feed loads courses in pages of 10 and **infinitely scrolls** — fetching the
 next page (`?limit=&offset=`) as you near the bottom, using the
-`X-Total-Count` header to know when to stop.
+`X-Total-Count` header to know when to stop. A **sort dropdown** (oldest/newest
+first, title A–Z/Z–A) reorders the feed via `?sort=&order=`.
 
 ## Project Structure
 
@@ -90,7 +91,7 @@ Failures return `400 { "error": "..." }`. Malformed JSON also returns a clean
 
 | Method | Path                               | Description       |
 | ------ | ---------------------------------- | ----------------- |
-| GET    | `/courses`                         | List courses. Optional `?q=` search, and `?limit=` (1–100) / `?offset=` (≥0) pagination. Total match count is returned in the `X-Total-Count` header. |
+| GET    | `/courses`                         | List courses. Optional `?q=` search, `?limit=` (1–100) / `?offset=` (≥0) pagination, and `?sort=` (`id`\|`title`) / `?order=` (`asc`\|`desc`) sorting. Total match count is returned in the `X-Total-Count` header. |
 | GET    | `/courses/:id`                     | Get a course      |
 | POST   | `/courses`                         | Create a course   |
 | PUT    | `/courses/:id`                     | Update a course   |

@@ -2,6 +2,7 @@ const feed = document.getElementById("feed");
 const hint = document.getElementById("hint");
 const fab = document.getElementById("fab");
 const searchInput = document.getElementById("search");
+const sortSelect = document.getElementById("sort");
 
 const modal = document.getElementById("modal");
 const modalForm = document.getElementById("modal-form");
@@ -286,6 +287,9 @@ async function loadFeed(reset) {
     offset: String(loadedCount),
   });
   if (query) params.set("q", query);
+  const [sortField, sortOrder] = sortSelect.value.split(":");
+  params.set("sort", sortField);
+  params.set("order", sortOrder);
 
   let courses;
   try {
@@ -338,5 +342,7 @@ searchInput.addEventListener("input", () => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => loadFeed(true), 250);
 });
+
+sortSelect.addEventListener("change", () => loadFeed(true));
 
 loadFeed(true);
