@@ -31,6 +31,15 @@ const lessonUpdateSchema = {
   order: { type: "integer", min: 1 },
 };
 
+// Only the owner of the parent course may modify its lessons. Runs after
+// requireAuth (so req.user is set) and the guard below (so req.course is set).
+function requireCourseOwner(req, res, next) {
+  if (req.course.userId !== req.user.id) {
+    return res.status(403).json({ error: "You do not own this course" });
+  }
+  next();
+}
+
 // Ensure the parent course exists for every nested lesson request.
 router.use((req, res, next) => {
   const course = findCourse(req.params.courseId);
@@ -71,7 +80,7 @@ router.get("/", (req, res) => {
 // Reorder all of a course's lessons. Body: { order: [lessonId, ...] } — a
 // permutation of every lesson id in the course. Declared before "/:lessonId"
 // so "reorder" isn't captured as a lesson id.
-router.put("/reorder", requireAuth, (req, res) => {
+router.put("/reorder", requireAuth, requireCourseOwner, (req, res) => {
   const ids = req.body?.order;
   if (!Array.isArray(ids) || ids.length === 0 || !ids.every(Number.isInteger)) {
     return res.status(400).json({ error: "order must be a non-empty array of lesson ids" });
@@ -92,14 +101,14 @@ router.get("/:lessonId", (req, res) => {
   res.json(lesson);
 });
 
-// Create a lesson under a course
-router.post("/", requireAuth, validateBody(lessonCreateSchema), (req, res) => {
+// Create a lesson under a course (course owner only)
+router.post("/", requireAuth, requireCourseOwner, validateBody(lessonCreateSchema), (req, res) => {
   const lesson = createLesson(req.course.id, req.body);
   res.status(201).json(lesson);
 });
 
-// Update a lesson
-router.put("/:lessonId", requireAuth, validateBody(lessonUpdateSchema), (req, res) => {
+// Update a lesson (course owner only)
+router.put("/:lessonId", requireAuth, requireCourseOwner, validateBody(lessonUpdateSchema), (req, res) => {
   const lesson = updateLesson(req.course.id, req.params.lessonId, req.body);
   if (!lesson) {
     return res.status(404).json({ error: "Lesson not found" });
@@ -107,8 +116,8 @@ router.put("/:lessonId", requireAuth, validateBody(lessonUpdateSchema), (req, re
   res.json(lesson);
 });
 
-// Delete a lesson
-router.delete("/:lessonId", requireAuth, (req, res) => {
+// Delete a lesson (course owner only)
+router.delete("/:lessonId", requireAuth, requireCourseOwner, (req, res) => {
   const removed = deleteLesson(req.course.id, req.params.lessonId);
   if (!removed) {
     return res.status(404).json({ error: "Lesson not found" });

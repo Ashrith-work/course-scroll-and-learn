@@ -9,15 +9,19 @@ const countSearchStmt = db.prepare(
   `SELECT COUNT(*) AS n FROM courses
    WHERE title LIKE @like ESCAPE '\\' OR description LIKE @like ESCAPE '\\'`
 );
-const selectCourse = db.prepare("SELECT id, title, description FROM courses WHERE id = ?");
-const insertCourse = db.prepare("INSERT INTO courses (title, description) VALUES (?, ?)");
+// Course rows always include the owner id (userId) and owner username (owner).
+const COURSE_COLUMNS = "c.id, c.title, c.description, c.user_id AS userId, u.username AS owner";
+const COURSE_FROM = "FROM courses c LEFT JOIN users u ON u.id = c.user_id";
+
+const selectCourse = db.prepare(`SELECT ${COURSE_COLUMNS} ${COURSE_FROM} WHERE c.id = ?`);
+const insertCourse = db.prepare("INSERT INTO courses (title, description, user_id) VALUES (?, ?, ?)");
 const updateCourseStmt = db.prepare("UPDATE courses SET title = ?, description = ? WHERE id = ?");
 const deleteCourseStmt = db.prepare("DELETE FROM courses WHERE id = ?");
 
 // Whitelists for ORDER BY. ORDER BY can't be parameterized, so sort/direction
 // are mapped through these tables — only known-safe SQL fragments are ever
 // interpolated. Defaults reproduce the previous behavior (id ASC).
-const SORT_COLUMNS = { id: "id", title: "title COLLATE NOCASE" };
+const SORT_COLUMNS = { id: "c.id", title: "c.title COLLATE NOCASE" };
 const SORT_DIRECTIONS = { asc: "ASC", desc: "DESC" };
 
 // LIMIT -1 means "no limit" in SQLite, so one statement serves paged and
@@ -28,11 +32,11 @@ function coursesStmt(hasSearch, sortExpr, dir) {
   let stmt = stmtCache.get(key);
   if (!stmt) {
     const where = hasSearch
-      ? `WHERE title LIKE @like ESCAPE '\\' OR description LIKE @like ESCAPE '\\'`
+      ? `WHERE c.title LIKE @like ESCAPE '\\' OR c.description LIKE @like ESCAPE '\\'`
       : "";
     stmt = db.prepare(
-      `SELECT id, title, description FROM courses ${where}
-       ORDER BY ${sortExpr} ${dir}, id ${dir} LIMIT @limit OFFSET @offset`
+      `SELECT ${COURSE_COLUMNS} ${COURSE_FROM} ${where}
+       ORDER BY ${sortExpr} ${dir}, c.id ${dir} LIMIT @limit OFFSET @offset`
     );
     stmtCache.set(key, stmt);
   }
@@ -72,8 +76,8 @@ export function findCourse(id) {
   return selectCourse.get(Number(id));
 }
 
-export function createCourse({ title, description = "" }) {
-  const { lastInsertRowid } = insertCourse.run(title, description);
+export function createCourse({ title, description = "", userId = null }) {
+  const { lastInsertRowid } = insertCourse.run(title, description, userId);
   return findCourse(lastInsertRowid);
 }
 

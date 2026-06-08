@@ -14,7 +14,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS courses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT ''
+    description TEXT NOT NULL DEFAULT '',
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS lessons (
@@ -42,6 +43,13 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 `);
+
+// Migration: add courses.user_id to databases created before ownership existed.
+const courseColumns = db.prepare("PRAGMA table_info(courses)").all().map((c) => c.name);
+if (!courseColumns.includes("user_id")) {
+  db.exec("ALTER TABLE courses ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL");
+}
+db.exec("CREATE INDEX IF NOT EXISTS idx_courses_user_id ON courses(user_id)");
 
 // Seed once, only if the courses table is empty.
 const courseCount = db.prepare("SELECT COUNT(*) AS n FROM courses").get().n;

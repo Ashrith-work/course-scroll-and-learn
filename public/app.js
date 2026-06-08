@@ -188,27 +188,30 @@ const LESSON_SORTS = [
 ];
 const LESSON_PAGE_SIZE = 10;
 
-function renderLessonItem(lesson, courseId, renderList) {
+function renderLessonItem(lesson, courseId, renderList, owned) {
   const li = el("li");
 
   const head = el("div", "lesson__head");
   head.appendChild(el("div", "lesson__title", `${lesson.order}. ${lesson.title}`));
 
-  const actions = el("div", "lesson__actions needs-auth");
-  const editBtn = el("button", "icon-btn", "✏️");
-  editBtn.title = "Edit lesson";
-  editBtn.addEventListener("click", () => openLessonForm(courseId, lesson, renderList));
-  const delBtn = el("button", "icon-btn", "🗑️");
-  delBtn.title = "Delete lesson";
-  delBtn.addEventListener("click", () =>
-    withAlert(async () => {
-      if (!confirm(`Delete lesson "${lesson.title}"?`)) return;
-      await api("DELETE", `/courses/${courseId}/lessons/${lesson.id}`);
-      await renderList();
-    })
-  );
-  actions.append(editBtn, delBtn);
-  head.appendChild(actions);
+  // Edit/delete a lesson only if the user owns the parent course.
+  if (owned) {
+    const actions = el("div", "lesson__actions");
+    const editBtn = el("button", "icon-btn", "✏️");
+    editBtn.title = "Edit lesson";
+    editBtn.addEventListener("click", () => openLessonForm(courseId, lesson, renderList));
+    const delBtn = el("button", "icon-btn", "🗑️");
+    delBtn.title = "Delete lesson";
+    delBtn.addEventListener("click", () =>
+      withAlert(async () => {
+        if (!confirm(`Delete lesson "${lesson.title}"?`)) return;
+        await api("DELETE", `/courses/${courseId}/lessons/${lesson.id}`);
+        await renderList();
+      })
+    );
+    actions.append(editBtn, delBtn);
+    head.appendChild(actions);
+  }
   li.appendChild(head);
 
   if (lesson.content) {
@@ -220,7 +223,7 @@ function renderLessonItem(lesson, courseId, renderList) {
 // Fetch and render the lesson list into `list`, using `state` for the current
 // search/sort. Pages of LESSON_PAGE_SIZE are appended via a "Load more" button.
 // `renderList` re-runs this from the top so edits/deletes refresh in place.
-async function fillLessonList(list, courseId, state, renderList) {
+async function fillLessonList(list, courseId, state, renderList, owned) {
   list.innerHTML = "";
 
   const ul = el("ul", "lessons");
@@ -255,7 +258,7 @@ async function fillLessonList(list, courseId, state, renderList) {
     }
 
     for (const lesson of lessons) {
-      ul.appendChild(renderLessonItem(lesson, courseId, renderList));
+      ul.appendChild(renderLessonItem(lesson, courseId, renderList, owned));
     }
     if (!ul.isConnected) list.appendChild(ul);
     loaded += lessons.length;
@@ -271,15 +274,13 @@ async function fillLessonList(list, courseId, state, renderList) {
   await loadPage();
 }
 
-async function refreshLessons(box, courseId) {
+async function refreshLessons(box, courseId, owned) {
   box.innerHTML = "";
 
   // Per-box state survives toggling the list closed/open within a session.
   const state = box._lessonState ?? (box._lessonState = { q: "", sort: "order", order: "asc" });
 
   const controls = el("div", "lesson-controls");
-
-  const addBtn = el("button", "mini-btn needs-auth", "+ Add lesson");
 
   const search = el("input", "lesson-search");
   search.type = "search";
@@ -299,23 +300,27 @@ async function refreshLessons(box, courseId) {
   }
   sort.value = `${state.sort}:${state.order}`;
 
-  controls.append(addBtn, search, sort);
+  controls.append(search, sort);
 
-  // Reordering only makes sense in the natural order view (no search, order ↑).
-  if (state.sort === "order" && state.order === "asc" && !state.q) {
-    const reorderBtn = el("button", "mini-btn needs-auth", "↕ Reorder");
-    reorderBtn.addEventListener("click", () => enterReorderMode(box, courseId));
-    controls.appendChild(reorderBtn);
+  const list = el("div", "lesson-list");
+  const renderList = () => fillLessonList(list, courseId, state, renderList, owned);
+
+  // Write controls (add lesson, reorder) only for the course owner.
+  if (owned) {
+    const addBtn = el("button", "mini-btn", "+ Add lesson");
+    addBtn.addEventListener("click", () => openLessonForm(courseId, null, renderList));
+    controls.prepend(addBtn);
+
+    // Reordering only makes sense in the natural order view (no search, order ↑).
+    if (state.sort === "order" && state.order === "asc" && !state.q) {
+      const reorderBtn = el("button", "mini-btn", "↕ Reorder");
+      reorderBtn.addEventListener("click", () => enterReorderMode(box, courseId, owned));
+      controls.appendChild(reorderBtn);
+    }
   }
 
   box.appendChild(controls);
-
-  const list = el("div", "lesson-list");
   box.appendChild(list);
-
-  const renderList = () => fillLessonList(list, courseId, state, renderList);
-
-  addBtn.addEventListener("click", () => openLessonForm(courseId, null, renderList));
 
   let timer;
   search.addEventListener("input", () => {
@@ -347,13 +352,13 @@ function dragAfterElement(container, y) {
   return closest.element;
 }
 
-async function enterReorderMode(box, courseId) {
+async function enterReorderMode(box, courseId, owned) {
   box.innerHTML = "";
 
   const controls = el("div", "lesson-controls");
   controls.appendChild(el("span", "reorder-hint", "Drag rows to reorder"));
   const doneBtn = el("button", "mini-btn", "✓ Done");
-  doneBtn.addEventListener("click", () => refreshLessons(box, courseId));
+  doneBtn.addEventListener("click", () => refreshLessons(box, courseId, owned));
   controls.appendChild(doneBtn);
   box.appendChild(controls);
 
@@ -403,7 +408,13 @@ async function enterReorderMode(box, courseId) {
 
 // --- Course card ---
 
+// Does the logged-in user own this course?
+function ownsCourse(course) {
+  return Boolean(auth?.user && course.userId != null && course.userId === auth.user.id);
+}
+
 function renderCourse(course, index, total) {
+  const owned = ownsCourse(course);
   const card = el("section", "card");
   card.dataset.id = course.id;
 
@@ -412,12 +423,28 @@ function renderCourse(course, index, total) {
   if (course.description) {
     card.appendChild(el("p", "card__desc", course.description));
   }
+  if (course.owner) {
+    card.appendChild(el("p", "card__owner", owned ? "by you" : `by ${course.owner}`));
+  }
 
   const actions = el("div", "card__actions");
   const viewBtn = el("button", "card__btn", "View lessons");
-  const editBtn = el("button", "card__btn card__btn--ghost needs-auth", "Edit");
-  const delBtn = el("button", "card__btn card__btn--ghost needs-auth", "Delete");
-  actions.append(viewBtn, editBtn, delBtn);
+  actions.appendChild(viewBtn);
+
+  // Edit/Delete only for the owner.
+  if (owned) {
+    const editBtn = el("button", "card__btn card__btn--ghost", "Edit");
+    const delBtn = el("button", "card__btn card__btn--ghost", "Delete");
+    editBtn.addEventListener("click", () => openCourseForm(course));
+    delBtn.addEventListener("click", () =>
+      withAlert(async () => {
+        if (!confirm(`Delete course "${course.title}" and its lessons?`)) return;
+        await api("DELETE", `/courses/${course.id}`);
+        await loadFeed(true);
+      })
+    );
+    actions.append(editBtn, delBtn);
+  }
   card.appendChild(actions);
 
   const lessonsBox = el("div", "lessons-box");
@@ -432,18 +459,9 @@ function renderCourse(course, index, total) {
         return;
       }
       viewBtn.textContent = "Loading…";
-      await refreshLessons(lessonsBox, course.id);
+      await refreshLessons(lessonsBox, course.id, owned);
       open = true;
       viewBtn.textContent = "Hide lessons";
-    })
-  );
-
-  editBtn.addEventListener("click", () => openCourseForm(course));
-  delBtn.addEventListener("click", () =>
-    withAlert(async () => {
-      if (!confirm(`Delete course "${course.title}" and its lessons?`)) return;
-      await api("DELETE", `/courses/${course.id}`);
-      await loadFeed(true);
     })
   );
 

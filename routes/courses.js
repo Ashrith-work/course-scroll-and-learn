@@ -66,28 +66,36 @@ router.get("/:id", (req, res) => {
   res.json(course);
 });
 
-// Create a course
+// Create a course, owned by the authenticated user.
 router.post("/", requireAuth, validateBody(courseCreateSchema), (req, res) => {
-  const course = createCourse(req.body);
+  const course = createCourse({ ...req.body, userId: req.user.id });
   res.status(201).json(course);
 });
 
-// Update a course
-router.put("/:id", requireAuth, validateBody(courseUpdateSchema), (req, res) => {
-  const course = updateCourse(req.params.id, req.body);
+// 404 if the course is missing, 403 if the user isn't its owner.
+function ownedCourseOr(res, req) {
+  const course = findCourse(req.params.id);
   if (!course) {
-    return res.status(404).json({ error: "Course not found" });
+    res.status(404).json({ error: "Course not found" });
+    return null;
   }
-  res.json(course);
+  if (course.userId !== req.user.id) {
+    res.status(403).json({ error: "You do not own this course" });
+    return null;
+  }
+  return course;
+}
+
+// Update a course (owner only)
+router.put("/:id", requireAuth, validateBody(courseUpdateSchema), (req, res) => {
+  if (!ownedCourseOr(res, req)) return;
+  res.json(updateCourse(req.params.id, req.body));
 });
 
-// Delete a course
+// Delete a course (owner only)
 router.delete("/:id", requireAuth, (req, res) => {
-  const removed = deleteCourse(req.params.id);
-  if (!removed) {
-    return res.status(404).json({ error: "Course not found" });
-  }
-  res.json(removed);
+  if (!ownedCourseOr(res, req)) return;
+  res.json(deleteCourse(req.params.id));
 });
 
 export default router;
