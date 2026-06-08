@@ -4,27 +4,48 @@ import db from "./db.js";
 
 // --- Courses ---
 
-const selectCourses = db.prepare("SELECT id, title, description FROM courses ORDER BY id");
+// LIMIT -1 means "no limit" in SQLite, so the same statement serves both the
+// paged and unpaged cases.
+const selectCourses = db.prepare(
+  "SELECT id, title, description FROM courses ORDER BY id LIMIT @limit OFFSET @offset"
+);
 const searchCourses = db.prepare(
   `SELECT id, title, description FROM courses
    WHERE title LIKE @like ESCAPE '\\' OR description LIKE @like ESCAPE '\\'
-   ORDER BY id`
+   ORDER BY id LIMIT @limit OFFSET @offset`
+);
+const countCoursesStmt = db.prepare("SELECT COUNT(*) AS n FROM courses");
+const countSearchStmt = db.prepare(
+  `SELECT COUNT(*) AS n FROM courses
+   WHERE title LIKE @like ESCAPE '\\' OR description LIKE @like ESCAPE '\\'`
 );
 const selectCourse = db.prepare("SELECT id, title, description FROM courses WHERE id = ?");
 const insertCourse = db.prepare("INSERT INTO courses (title, description) VALUES (?, ?)");
 const updateCourseStmt = db.prepare("UPDATE courses SET title = ?, description = ? WHERE id = ?");
 const deleteCourseStmt = db.prepare("DELETE FROM courses WHERE id = ?");
 
-// Search courses by title/description. Falls back to listing all when the
-// query is empty. LIKE wildcards in the query are escaped so they match
-// literally.
-export function listCourses(search) {
+function searchLike(term) {
+  return `%${term.replace(/[\\%_]/g, "\\$&")}%`;
+}
+
+// Search courses by title/description (empty query = all), with optional
+// pagination. LIKE wildcards in the query are escaped so they match literally.
+export function listCourses(search, { limit, offset } = {}) {
+  const term = typeof search === "string" ? search.trim() : "";
+  const params = { limit: limit ?? -1, offset: offset ?? 0 };
+  if (term === "") {
+    return selectCourses.all(params);
+  }
+  return searchCourses.all({ ...params, like: searchLike(term) });
+}
+
+// Total number of courses matching the (optional) search term.
+export function countCourses(search) {
   const term = typeof search === "string" ? search.trim() : "";
   if (term === "") {
-    return selectCourses.all();
+    return countCoursesStmt.get().n;
   }
-  const escaped = term.replace(/[\\%_]/g, "\\$&");
-  return searchCourses.all({ like: `%${escaped}%` });
+  return countSearchStmt.get({ like: searchLike(term) }).n;
 }
 
 export function findCourse(id) {

@@ -121,12 +121,14 @@ function openCourseForm(course) {
     ],
     onSubmit: async (data) => {
       const body = { title: data.title.trim(), description: data.description.trim() };
-      const saved = isEdit
-        ? await api("PUT", `/courses/${course.id}`, body)
-        : await api("POST", "/courses", body);
-      // Clear an active search on create so the new course is visible.
-      if (!isEdit) searchInput.value = "";
-      await loadFeed(saved.id);
+      if (isEdit) {
+        await api("PUT", `/courses/${course.id}`, body);
+      } else {
+        await api("POST", "/courses", body);
+        // Clear an active search on create so the new course is visible.
+        searchInput.value = "";
+      }
+      await loadFeed(true);
     },
   });
 }
@@ -251,7 +253,7 @@ function renderCourse(course, index, total) {
     withAlert(async () => {
       if (!confirm(`Delete course "${course.title}" and its lessons?`)) return;
       await api("DELETE", `/courses/${course.id}`);
-      await loadFeed();
+      await loadFeed(true);
     })
   );
 
@@ -259,46 +261,82 @@ function renderCourse(course, index, total) {
   return card;
 }
 
-// --- Feed ---
+// --- Feed (paginated, infinite scroll) ---
 
-async function loadFeed(targetCourseId) {
+const PAGE_SIZE = 10;
+let loadedCount = 0;
+let totalCount = 0;
+let loading = false;
+
+// loadFeed(true) resets to the first page (initial load, search change, or after
+// a mutation). loadFeed(false) appends the next page for infinite scroll.
+async function loadFeed(reset) {
+  if (loading) return;
+  if (!reset && loadedCount >= totalCount) return; // everything is loaded
+  loading = true;
+
   const query = searchInput.value.trim();
-  const url = query ? `/courses?q=${encodeURIComponent(query)}` : "/courses";
+  if (reset) {
+    loadedCount = 0;
+    totalCount = 0;
+  }
+
+  const params = new URLSearchParams({
+    limit: String(PAGE_SIZE),
+    offset: String(loadedCount),
+  });
+  if (query) params.set("q", query);
 
   let courses;
   try {
-    courses = await api("GET", url);
+    const res = await fetch(`/courses?${params}`);
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    totalCount = Number(res.headers.get("X-Total-Count"));
+    courses = await res.json();
+    if (!Number.isFinite(totalCount)) totalCount = courses.length;
   } catch (err) {
-    renderState(`Could not load courses: ${err.message}`);
-    hint.style.display = "none";
+    if (reset) {
+      renderState(`Could not load courses: ${err.message}`);
+      hint.style.display = "none";
+    }
+    loading = false;
     return;
   }
 
-  if (courses.length === 0) {
+  if (reset) feed.innerHTML = "";
+
+  if (reset && courses.length === 0) {
     renderState(
       query ? `No courses match “${query}”.` : "No courses yet. Tap ＋ to create one."
     );
     hint.style.display = "none";
+    loading = false;
     return;
   }
 
   hint.style.display = "";
-  feed.innerHTML = "";
   courses.forEach((course, i) => {
-    feed.appendChild(renderCourse(course, i, courses.length));
+    feed.appendChild(renderCourse(course, loadedCount + i, totalCount));
   });
-
-  if (targetCourseId != null) {
-    feed.querySelector(`.card[data-id="${targetCourseId}"]`)?.scrollIntoView();
-  }
+  loadedCount += courses.length;
+  loading = false;
 }
+
+// Load the next page when the user scrolls within a viewport of the bottom.
+feed.addEventListener("scroll", () => {
+  if (loading || loadedCount >= totalCount) return;
+  const remaining = feed.scrollHeight - feed.scrollTop - feed.clientHeight;
+  if (remaining < feed.clientHeight) {
+    loadFeed(false);
+  }
+});
 
 fab.addEventListener("click", () => openCourseForm(null));
 
 let searchTimer;
 searchInput.addEventListener("input", () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => loadFeed(), 250);
+  searchTimer = setTimeout(() => loadFeed(true), 250);
 });
 
-loadFeed();
+loadFeed(true);
