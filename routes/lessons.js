@@ -7,9 +7,22 @@ import {
   updateLesson,
   deleteLesson,
 } from "../data/store.js";
+import { validateBody } from "../middleware/validate.js";
 
 // mergeParams lets us read :courseId from the parent (courses) router.
 const router = Router({ mergeParams: true });
+
+const lessonCreateSchema = {
+  title: { type: "string", required: true, maxLength: 200 },
+  content: { type: "string", default: "", maxLength: 5000 },
+  order: { type: "integer", min: 1 },
+};
+
+const lessonUpdateSchema = {
+  title: { type: "string", minLength: 1, maxLength: 200 },
+  content: { type: "string", maxLength: 5000 },
+  order: { type: "integer", min: 1 },
+};
 
 // Ensure the parent course exists for every nested lesson request.
 router.use((req, res, next) => {
@@ -36,19 +49,14 @@ router.get("/:lessonId", (req, res) => {
 });
 
 // Create a lesson under a course
-router.post("/", (req, res) => {
-  const { title, content, order } = req.body ?? {};
-  if (!title) {
-    return res.status(400).json({ error: "title is required" });
-  }
-  const lesson = createLesson(req.course.id, { title, content, order });
+router.post("/", validateBody(lessonCreateSchema), (req, res) => {
+  const lesson = createLesson(req.course.id, req.body);
   res.status(201).json(lesson);
 });
 
 // Update a lesson
-router.put("/:lessonId", (req, res) => {
-  const { title, content, order } = req.body ?? {};
-  const lesson = updateLesson(req.course.id, req.params.lessonId, { title, content, order });
+router.put("/:lessonId", validateBody(lessonUpdateSchema), (req, res) => {
+  const lesson = updateLesson(req.course.id, req.params.lessonId, req.body);
   if (!lesson) {
     return res.status(404).json({ error: "Lesson not found" });
   }

@@ -19,6 +19,14 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+// Turn malformed JSON bodies into a clean 400 instead of an HTML error page.
+app.use((err, req, res, next) => {
+  if (err?.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
+  next(err);
+});
+
 // Only start listening when run directly (not when imported by tests).
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {

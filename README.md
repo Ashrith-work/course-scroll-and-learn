@@ -52,6 +52,8 @@ Forms use a native `<dialog>` modal and talk to the same REST API.
 ├── routes/
 │   ├── courses.js      # /courses CRUD
 │   └── lessons.js      # /courses/:courseId/lessons CRUD (nested)
+├── middleware/
+│   └── validate.js     # schema-driven request-body validation
 ├── tests/
 │   └── api.test.js     # API tests (node --test)
 ├── package.json        # Project metadata and scripts
@@ -65,6 +67,15 @@ The database file (`courses.db`) is created automatically on first run, with the
 schema applied and sample data seeded. It is gitignored.
 
 Override the location with the `DB_PATH` environment variable.
+
+## Validation
+
+Create/update requests are validated by schema-driven middleware
+(`middleware/validate.js`) before reaching the handlers. It checks required
+fields, types, string length, and integer ranges; trims strings; coerces
+numeric-string integers; and replaces `req.body` with a cleaned object.
+Failures return `400 { "error": "..." }`. Malformed JSON also returns a clean
+`400`.
 
 ## API
 

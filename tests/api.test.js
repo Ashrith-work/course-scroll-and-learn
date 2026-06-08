@@ -95,6 +95,39 @@ test("POST /courses without a title returns 400", async () => {
   assert.equal((await res.json()).error, "title is required");
 });
 
+test("POST /courses with a blank title returns 400", async () => {
+  const res = await req("POST", "/courses", { title: "   " });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error, "title is required");
+});
+
+test("POST /courses with a non-string title returns 400", async () => {
+  const res = await req("POST", "/courses", { title: 123 });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error, "title must be a string");
+});
+
+test("POST /courses trims the title", async () => {
+  const created = await (await req("POST", "/courses", { title: "  Trimmed  " })).json();
+  assert.equal(created.title, "Trimmed");
+});
+
+test("POST /courses enforces title maxLength", async () => {
+  const res = await req("POST", "/courses", { title: "x".repeat(201) });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /at most 200/);
+});
+
+test("malformed JSON body returns 400", async () => {
+  const res = await fetch(baseURL + "/courses", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{ not json ",
+  });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error, "Invalid JSON body");
+});
+
 test("PUT /courses/:id updates a course", async () => {
   const created = await (await req("POST", "/courses", { title: "Temp" })).json();
   const res = await req("PUT", `/courses/${created.id}`, { title: "Renamed" });
@@ -138,6 +171,26 @@ test("POST lesson auto-assigns the next order", async () => {
 test("POST lesson without a title returns 400", async () => {
   const res = await req("POST", "/courses/1/lessons", { content: "no title" });
   assert.equal(res.status, 400);
+});
+
+test("POST lesson with a non-integer order returns 400", async () => {
+  const res = await req("POST", "/courses/1/lessons", { title: "Bad order", order: "abc" });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error, "order must be an integer");
+});
+
+test("POST lesson with order below the minimum returns 400", async () => {
+  const res = await req("POST", "/courses/1/lessons", { title: "Zero order", order: 0 });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, />= 1/);
+});
+
+test("POST lesson coerces a numeric-string order", async () => {
+  const course = await (await req("POST", "/courses", { title: "Coerce" })).json();
+  const lesson = await (
+    await req("POST", `/courses/${course.id}/lessons`, { title: "Three", order: "3" })
+  ).json();
+  assert.equal(lesson.order, 3);
 });
 
 test("a lesson is not reachable through the wrong course", async () => {

@@ -6,9 +6,20 @@ import {
   updateCourse,
   deleteCourse,
 } from "../data/store.js";
+import { validateBody } from "../middleware/validate.js";
 import lessonsRouter from "./lessons.js";
 
 const router = Router();
+
+const courseCreateSchema = {
+  title: { type: "string", required: true, maxLength: 200 },
+  description: { type: "string", default: "", maxLength: 2000 },
+};
+
+const courseUpdateSchema = {
+  title: { type: "string", minLength: 1, maxLength: 200 },
+  description: { type: "string", maxLength: 2000 },
+};
 
 // Nested lessons: /courses/:courseId/lessons
 router.use("/:courseId/lessons", lessonsRouter);
@@ -28,19 +39,14 @@ router.get("/:id", (req, res) => {
 });
 
 // Create a course
-router.post("/", (req, res) => {
-  const { title, description } = req.body ?? {};
-  if (!title) {
-    return res.status(400).json({ error: "title is required" });
-  }
-  const course = createCourse({ title, description });
+router.post("/", validateBody(courseCreateSchema), (req, res) => {
+  const course = createCourse(req.body);
   res.status(201).json(course);
 });
 
 // Update a course
-router.put("/:id", (req, res) => {
-  const { title, description } = req.body ?? {};
-  const course = updateCourse(req.params.id, { title, description });
+router.put("/:id", validateBody(courseUpdateSchema), (req, res) => {
+  const course = updateCourse(req.params.id, req.body);
   if (!course) {
     return res.status(404).json({ error: "Course not found" });
   }
